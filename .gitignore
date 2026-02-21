@@ -28,6 +28,11 @@ cmake_install.cmake
 *.ilk
 *.exp
 
+# Node / Electron
+node_modules/
+dist/
+pnpm-debug.log*
+
 # OS
 Thumbs.db
 Desktop.ini
