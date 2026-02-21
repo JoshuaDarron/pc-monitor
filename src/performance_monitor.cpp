@@ -21,6 +21,8 @@ namespace PCMonitor {
         , cpu_query_(nullptr)
         , cpu_counter_(nullptr)
         , gpu_device_(nullptr)
+        , cached_core_count_(0)
+        , cached_thread_count_(0)
     {
         // Initialize metrics structures
         memset(&gpu_metrics_, 0, sizeof(gpu_metrics_));
@@ -65,6 +67,9 @@ namespace PCMonitor {
             return false;
         }
         
+        // Cache CPU topology (core/thread count never changes at runtime)
+        CacheCPUTopology();
+
         // Open log file
         log_file_.open("pc_monitor_log.csv", std::ios::app);
         if (!log_file_.is_open()) {
@@ -212,16 +217,12 @@ namespace PCMonitor {
         #endif
     }
 
-    void PerformanceMonitor::CollectCPUMetrics() {
-        // Get CPU info using CPUID
-        int cpu_info[4];
-        __cpuid(cpu_info, 0);
-        
+    void PerformanceMonitor::CacheCPUTopology() {
         SYSTEM_INFO sys_info;
         GetSystemInfo(&sys_info);
-        cpu_metrics_.core_count = sys_info.dwNumberOfProcessors;
-        
-        // For thread count, we'll use a more accurate method
+        cached_core_count_ = sys_info.dwNumberOfProcessors;
+        cached_thread_count_ = cached_core_count_; // Fallback
+
         DWORD length = 0;
         GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
         if (length > 0) {
@@ -230,12 +231,11 @@ namespace PCMonitor {
             if (GetLogicalProcessorInformationEx(RelationProcessorCore, info, &length)) {
                 uint32_t logical_processors = 0;
                 uint32_t physical_cores = 0;
-                
+
                 auto current = info;
                 while (reinterpret_cast<uint8_t*>(current) < buffer.data() + length) {
                     if (current->Relationship == RelationProcessorCore) {
                         physical_cores++;
-                        // Count set bits in the processor mask
                         for (int i = 0; i < current->Processor.GroupCount; i++) {
                             KAFFINITY mask = current->Processor.GroupMask[i].Mask;
                             while (mask) {
@@ -247,14 +247,18 @@ namespace PCMonitor {
                     current = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
                         reinterpret_cast<uint8_t*>(current) + current->Size);
                 }
-                
-                cpu_metrics_.core_count = physical_cores;
-                cpu_metrics_.thread_count = logical_processors;
+
+                cached_core_count_ = physical_cores;
+                cached_thread_count_ = logical_processors;
             }
-        } else {
-            cpu_metrics_.thread_count = cpu_metrics_.core_count; // Fallback
         }
-        
+    }
+
+    void PerformanceMonitor::CollectCPUMetrics() {
+        // Use cached topology instead of re-querying every second
+        cpu_metrics_.core_count = cached_core_count_;
+        cpu_metrics_.thread_count = cached_thread_count_;
+
         // Collect PDH data
         PdhCollectQueryData(cpu_query_);
         

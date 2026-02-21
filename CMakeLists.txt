@@ -92,9 +92,13 @@ if(NVML_FOUND)
     include_directories(${NVML_INCLUDE_DIR})
 endif()
 
-# Source files (only the ones we actually have)
+# Source files
 set(SOURCES
     src/performance_monitor.cpp
+    src/thermal_monitor.cpp
+    src/power_monitor.cpp
+    src/data_logger.cpp
+    src/web_interface.cpp
 )
 
 set(HEADERS

@@ -250,22 +250,34 @@
             return bytes + ' MB';
         }
 
+        // Element reference cache — avoids repeated getElementById calls
+        const elementCache = new Map();
+
+        function getCachedElement(id) {
+            let el = elementCache.get(id);
+            if (!el) {
+                el = document.getElementById(id);
+                if (el) elementCache.set(id, el);
+            }
+            return el;
+        }
+
         function updateElement(id, value) {
-            const element = document.getElementById(id);
+            const element = getCachedElement(id);
             if (element && element.textContent !== value) {
                 element.textContent = value;
             }
         }
 
         function updateBar(id, percentage) {
-            const element = document.getElementById(id);
+            const element = getCachedElement(id);
             if (element) {
                 element.style.width = percentage + '%';
             }
         }
 
         function updatePerformanceIndicator(id, className, text) {
-            const element = document.getElementById(id);
+            const element = getCachedElement(id);
             if (element) {
                 element.className = 'performance-indicator ' + className;
                 element.textContent = text;
@@ -442,6 +454,7 @@
                     </div>
                 `;
                 document.getElementById('dashboard').innerHTML = dashboardHTML;
+                elementCache.clear(); // Invalidate cached refs after DOM rebuild
                 isInitialized = true;
         }
 
@@ -464,54 +477,57 @@
                     return; // Skip update on first load, let initialization settle
                 }
 
-                // Calculate percentages and performance indicators
-                const vramPercent = (data.gpu.vram_used_mb / data.gpu.vram_total_mb * 100).toFixed(1);
-                const ramPercent = data.ram.utilization_percent.toFixed(1);
-                const powerPercent = (data.power.system_power_w / data.power.psu_wattage * 100).toFixed(1);
+                // Batch all DOM mutations into a single repaint
+                requestAnimationFrame(() => {
+                    // Calculate percentages and performance indicators
+                    const vramPercent = (data.gpu.vram_used_mb / data.gpu.vram_total_mb * 100).toFixed(1);
+                    const ramPercent = data.ram.utilization_percent.toFixed(1);
+                    const powerPercent = (data.power.system_power_w / data.power.psu_wattage * 100).toFixed(1);
 
-                // Performance classifications
-                const cpuTempClass = getPerformanceClass(data.cpu.temperature_c, {excellent: 0, good: 50, fair: 75, poor: 85});
-                const gpuTempClass = getPerformanceClass(data.gpu.temperature_c, {excellent: 0, good: 60, fair: 80, poor: 90});
+                    // Performance classifications
+                    const cpuTempClass = getPerformanceClass(data.cpu.temperature_c, {excellent: 0, good: 50, fair: 75, poor: 85});
+                    const gpuTempClass = getPerformanceClass(data.gpu.temperature_c, {excellent: 0, good: 60, fair: 80, poor: 90});
 
-                // Update all values without regenerating HTML
-                updateElement('gpu-vram-text', `${data.gpu.vram_used_mb} / ${data.gpu.vram_total_mb} MB (${vramPercent}%)`);
-                updateBar('gpu-vram-bar', vramPercent);
-                updateElement('gpu-clock', `${data.gpu.core_clock_mhz} MHz`);
-                updateBar('gpu-usage-bar', Math.min(data.gpu.utilization_percent, 100));
-                updateElement('gpu-temp', data.gpu.temperature_c);
-                updatePerformanceIndicator('gpu-temp-indicator', gpuTempClass, gpuTempClass);
-                updateElement('gpu-usage', `${data.gpu.utilization_percent}%`);
+                    // Update all values without regenerating HTML
+                    updateElement('gpu-vram-text', `${data.gpu.vram_used_mb} / ${data.gpu.vram_total_mb} MB (${vramPercent}%)`);
+                    updateBar('gpu-vram-bar', vramPercent);
+                    updateElement('gpu-clock', `${data.gpu.core_clock_mhz} MHz`);
+                    updateBar('gpu-usage-bar', Math.min(data.gpu.utilization_percent, 100));
+                    updateElement('gpu-temp', data.gpu.temperature_c);
+                    updatePerformanceIndicator('gpu-temp-indicator', gpuTempClass, gpuTempClass);
+                    updateElement('gpu-usage', `${data.gpu.utilization_percent}%`);
 
-                updateElement('cpu-cores', `${data.cpu.core_count} / ${data.cpu.thread_count}`);
-                updateElement('cpu-usage', `${data.cpu.utilization_percent}%`);
-                updateBar('cpu-usage-bar', Math.min(data.cpu.utilization_percent, 100));
-                updateElement('cpu-clock', `${data.cpu.current_clock_mhz} MHz`);
-                updateElement('cpu-temp', data.cpu.temperature_c);
-                updatePerformanceIndicator('cpu-temp-indicator', cpuTempClass, cpuTempClass);
+                    updateElement('cpu-cores', `${data.cpu.core_count} / ${data.cpu.thread_count}`);
+                    updateElement('cpu-usage', `${data.cpu.utilization_percent}%`);
+                    updateBar('cpu-usage-bar', Math.min(data.cpu.utilization_percent, 100));
+                    updateElement('cpu-clock', `${data.cpu.current_clock_mhz} MHz`);
+                    updateElement('cpu-temp', data.cpu.temperature_c);
+                    updatePerformanceIndicator('cpu-temp-indicator', cpuTempClass, cpuTempClass);
 
-                updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)} (${ramPercent}%)`);
-                updateBar('ram-usage-bar', ramPercent);
-                updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
+                    updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)} (${ramPercent}%)`);
+                    updateBar('ram-usage-bar', ramPercent);
+                    updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
 
-                updateElement('storage-read', `${data.storage.seq_read_mbps} MB/s`);
-                updateBar('storage-read-bar', Math.min(data.storage.seq_read_mbps / 100, 100));
-                updateElement('storage-write', `${data.storage.seq_write_mbps} MB/s`);
-                updateBar('storage-write-bar', Math.min(data.storage.seq_write_mbps / 100, 100));
-                updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
-                updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
+                    updateElement('storage-read', `${data.storage.seq_read_mbps} MB/s`);
+                    updateBar('storage-read-bar', Math.min(data.storage.seq_read_mbps / 100, 100));
+                    updateElement('storage-write', `${data.storage.seq_write_mbps} MB/s`);
+                    updateBar('storage-write-bar', Math.min(data.storage.seq_write_mbps / 100, 100));
+                    updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
+                    updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
 
-                updateElement('power-usage', `${data.power.system_power_w}W / ${data.power.psu_wattage}W (${powerPercent}%)`);
-                updateBar('power-usage-bar', powerPercent);
-                updateElement('power-efficiency', data.power.efficiency_percent);
-                updateElement('power-cpu', `${data.power.cpu_power_w}W`);
-                updateElement('power-gpu', `${data.power.gpu_power_w}W`);
-                updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
+                    updateElement('power-usage', `${data.power.system_power_w}W / ${data.power.psu_wattage}W (${powerPercent}%)`);
+                    updateBar('power-usage-bar', powerPercent);
+                    updateElement('power-efficiency', data.power.efficiency_percent);
+                    updateElement('power-cpu', `${data.power.cpu_power_w}W`);
+                    updateElement('power-gpu', `${data.power.gpu_power_w}W`);
+                    updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
 
-                if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
-                    updateElement('fan-speeds', `${data.thermal.fan_speeds_rpm.slice(0, 3).join(' / ')} RPM`);
-                }
+                    if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
+                        updateElement('fan-speeds', `${data.thermal.fan_speeds_rpm.slice(0, 3).join(' / ')} RPM`);
+                    }
 
-                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                    updateElement('lastUpdate', `Last updated: ${new Date().toLocaleTimeString()}`);
+                });
 
             } catch (error) {
                 console.error('Error fetching metrics:', error);
@@ -525,21 +541,40 @@
                         </div>
                     `;
                     document.getElementById('lastUpdate').textContent = `Connection lost at ${new Date().toLocaleTimeString()}`;
+                    elementCache.clear();
                     isInitialized = false;
                 }
             }
         }
 
-        // Update every second
-        setInterval(updateMetrics, 1000);
-        
-        // Initial load
-        updateMetrics();
+        // Recursive setTimeout — schedules next poll only after current one completes
+        let pollTimeoutId = null;
 
-        // No animations - static interface
-        document.addEventListener('DOMContentLoaded', function() {
-            // Dashboard loaded - no animations applied
+        function schedulePoll() {
+            pollTimeoutId = setTimeout(async () => {
+                await updateMetrics();
+                schedulePoll();
+            }, 1000);
+        }
+
+        // Pause polling when the window is hidden/minimized, resume when visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (pollTimeoutId !== null) {
+                    clearTimeout(pollTimeoutId);
+                    pollTimeoutId = null;
+                }
+            } else {
+                if (pollTimeoutId === null) {
+                    updateMetrics();
+                    schedulePoll();
+                }
+            }
         });
+
+        // Initial load + start polling
+        updateMetrics();
+        schedulePoll();
     </script>
 </body>
 </html>

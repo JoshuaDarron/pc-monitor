@@ -57,11 +57,16 @@ namespace PCMonitor {
         StorageMetrics storage_metrics_;
         PowerMetrics power_metrics_;
         ThermalMetrics thermal_metrics_;
-        
+
+        // Cached CPU topology (never changes at runtime)
+        uint32_t cached_core_count_;
+        uint32_t cached_thread_count_;
+
         // Private methods
         bool InitializeNVML();
         bool InitializePDH();
         bool InitializeWMI();
+        void CacheCPUTopology();
         
         void CollectGPUMetrics();
         void CollectCPUMetrics();

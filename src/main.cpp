@@ -38,66 +38,75 @@ void SignalHandler(int signal) {
     exit(0);
 }
 
+// Helper to format a double with 1 decimal place without ostringstream
+static std::string to_fixed1(double val) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.1f", val);
+    return buf;
+}
+
 // Generate JSON response with current metrics
 std::string GenerateJsonResponse(const PCMonitor::PerformanceMonitor& monitor) {
-    auto gpu = monitor.GetGPUMetrics();
-    auto cpu = monitor.GetCPUMetrics();
-    auto ram = monitor.GetRAMMetrics();
-    auto storage = monitor.GetStorageMetrics();
-    auto power = monitor.GetPowerMetrics();
-    auto thermal = monitor.GetThermalMetrics();
-    
-    std::ostringstream json;
-    json << "{\n";
-    json << "  \"timestamp\": " << std::time(nullptr) << ",\n";
-    json << "  \"gpu\": {\n";
-    json << "    \"vram_used_mb\": " << gpu.vram_used_mb << ",\n";
-    json << "    \"vram_total_mb\": " << gpu.vram_total_mb << ",\n";
-    json << "    \"core_clock_mhz\": " << gpu.core_clock_mhz << ",\n";
-    json << "    \"temperature_c\": " << gpu.temperature_c << ",\n";
-    json << "    \"utilization_percent\": " << gpu.utilization_percent << ",\n";
-    json << "    \"power_draw_w\": " << gpu.power_draw_w << "\n";
-    json << "  },\n";
-    json << "  \"cpu\": {\n";
-    json << "    \"utilization_percent\": " << std::fixed << std::setprecision(1) << cpu.utilization_percent << ",\n";
-    json << "    \"temperature_c\": " << cpu.temperature_c << ",\n";
-    json << "    \"current_clock_mhz\": " << cpu.current_clock_mhz << ",\n";
-    json << "    \"core_count\": " << cpu.core_count << ",\n";
-    json << "    \"thread_count\": " << cpu.thread_count << "\n";
-    json << "  },\n";
-    json << "  \"ram\": {\n";
-    json << "    \"used_mb\": " << ram.used_mb << ",\n";
-    json << "    \"total_mb\": " << ram.total_mb << ",\n";
-    json << "    \"utilization_percent\": " << std::fixed << std::setprecision(1) << ram.utilization_percent << ",\n";
-    json << "    \"speed_mhz\": " << ram.speed_mhz << "\n";
-    json << "  },\n";
-    json << "  \"storage\": {\n";
-    json << "    \"seq_read_mbps\": " << storage.seq_read_mbps << ",\n";
-    json << "    \"seq_write_mbps\": " << storage.seq_write_mbps << ",\n";
-    json << "    \"random_read_iops\": " << storage.random_read_iops << ",\n";
-    json << "    \"random_write_iops\": " << storage.random_write_iops << "\n";
-    json << "  },\n";
-    json << "  \"power\": {\n";
-    json << "    \"system_power_w\": " << power.system_power_w << ",\n";
-    json << "    \"cpu_power_w\": " << power.cpu_power_w << ",\n";
-    json << "    \"gpu_power_w\": " << power.gpu_power_w << ",\n";
-    json << "    \"psu_wattage\": " << power.psu_wattage << ",\n";
-    json << "    \"efficiency_percent\": " << std::fixed << std::setprecision(1) << power.efficiency_percent << "\n";
-    json << "  },\n";
-    json << "  \"thermal\": {\n";
-    json << "    \"cpu_temp_c\": " << thermal.cpu_temp_c << ",\n";
-    json << "    \"gpu_temp_c\": " << thermal.gpu_temp_c << ",\n";
-    json << "    \"case_temp_c\": " << thermal.case_temp_c << ",\n";
-    json << "    \"fan_speeds_rpm\": [";
+    const auto& gpu = monitor.GetGPUMetrics();
+    const auto& cpu = monitor.GetCPUMetrics();
+    const auto& ram = monitor.GetRAMMetrics();
+    const auto& storage = monitor.GetStorageMetrics();
+    const auto& power = monitor.GetPowerMetrics();
+    const auto& thermal = monitor.GetThermalMetrics();
+
+    std::string json;
+    json.reserve(2048);
+
+    json += "{\n";
+    json += "  \"timestamp\": " + std::to_string(std::time(nullptr)) + ",\n";
+    json += "  \"gpu\": {\n";
+    json += "    \"vram_used_mb\": " + std::to_string(gpu.vram_used_mb) + ",\n";
+    json += "    \"vram_total_mb\": " + std::to_string(gpu.vram_total_mb) + ",\n";
+    json += "    \"core_clock_mhz\": " + std::to_string(gpu.core_clock_mhz) + ",\n";
+    json += "    \"temperature_c\": " + std::to_string(gpu.temperature_c) + ",\n";
+    json += "    \"utilization_percent\": " + std::to_string(gpu.utilization_percent) + ",\n";
+    json += "    \"power_draw_w\": " + std::to_string(gpu.power_draw_w) + "\n";
+    json += "  },\n";
+    json += "  \"cpu\": {\n";
+    json += "    \"utilization_percent\": " + to_fixed1(cpu.utilization_percent) + ",\n";
+    json += "    \"temperature_c\": " + std::to_string(cpu.temperature_c) + ",\n";
+    json += "    \"current_clock_mhz\": " + std::to_string(cpu.current_clock_mhz) + ",\n";
+    json += "    \"core_count\": " + std::to_string(cpu.core_count) + ",\n";
+    json += "    \"thread_count\": " + std::to_string(cpu.thread_count) + "\n";
+    json += "  },\n";
+    json += "  \"ram\": {\n";
+    json += "    \"used_mb\": " + std::to_string(ram.used_mb) + ",\n";
+    json += "    \"total_mb\": " + std::to_string(ram.total_mb) + ",\n";
+    json += "    \"utilization_percent\": " + to_fixed1(ram.utilization_percent) + ",\n";
+    json += "    \"speed_mhz\": " + std::to_string(ram.speed_mhz) + "\n";
+    json += "  },\n";
+    json += "  \"storage\": {\n";
+    json += "    \"seq_read_mbps\": " + std::to_string(storage.seq_read_mbps) + ",\n";
+    json += "    \"seq_write_mbps\": " + std::to_string(storage.seq_write_mbps) + ",\n";
+    json += "    \"random_read_iops\": " + std::to_string(storage.random_read_iops) + ",\n";
+    json += "    \"random_write_iops\": " + std::to_string(storage.random_write_iops) + "\n";
+    json += "  },\n";
+    json += "  \"power\": {\n";
+    json += "    \"system_power_w\": " + std::to_string(power.system_power_w) + ",\n";
+    json += "    \"cpu_power_w\": " + std::to_string(power.cpu_power_w) + ",\n";
+    json += "    \"gpu_power_w\": " + std::to_string(power.gpu_power_w) + ",\n";
+    json += "    \"psu_wattage\": " + std::to_string(power.psu_wattage) + ",\n";
+    json += "    \"efficiency_percent\": " + to_fixed1(power.efficiency_percent) + "\n";
+    json += "  },\n";
+    json += "  \"thermal\": {\n";
+    json += "    \"cpu_temp_c\": " + std::to_string(thermal.cpu_temp_c) + ",\n";
+    json += "    \"gpu_temp_c\": " + std::to_string(thermal.gpu_temp_c) + ",\n";
+    json += "    \"case_temp_c\": " + std::to_string(thermal.case_temp_c) + ",\n";
+    json += "    \"fan_speeds_rpm\": [";
     for (size_t i = 0; i < thermal.fan_speeds_rpm.size(); ++i) {
-        json << thermal.fan_speeds_rpm[i];
-        if (i < thermal.fan_speeds_rpm.size() - 1) json << ",";
+        json += std::to_string(thermal.fan_speeds_rpm[i]);
+        if (i < thermal.fan_speeds_rpm.size() - 1) json += ",";
     }
-    json << "]\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    json += "]\n";
+    json += "  }\n";
+    json += "}";
+
+    return json;
 }
 
 // Read HTML file
@@ -173,15 +182,16 @@ std::string ReadHTMLFile(const std::string& filename) {
 
 // Create HTTP response
 std::string CreateHTTPResponse(const std::string& content, const std::string& content_type = "text/html") {
-    std::ostringstream response;
-    response << "HTTP/1.1 200 OK\r\n";
-    response << "Content-Type: " << content_type << "\r\n";
-    response << "Content-Length: " << content.length() << "\r\n";
-    response << "Access-Control-Allow-Origin: *\r\n";
-    response << "Cache-Control: no-cache\r\n";
-    response << "\r\n";
-    response << content;
-    return response.str();
+    std::string response;
+    response.reserve(256 + content.length());
+    response += "HTTP/1.1 200 OK\r\n";
+    response += "Content-Type: " + content_type + "\r\n";
+    response += "Content-Length: " + std::to_string(content.length()) + "\r\n";
+    response += "Access-Control-Allow-Origin: *\r\n";
+    response += "Cache-Control: no-cache\r\n";
+    response += "\r\n";
+    response += content;
+    return response;
 }
 
 // Handle HTTP request
