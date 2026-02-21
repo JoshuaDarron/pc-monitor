@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC Performance Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .dashboard {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            display: none;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #b0b0b0;
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .metric-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .metric-fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .gpu-fill { background: linear-gradient(90deg, #ff6b6b, #ff8e53); }
+        .cpu-fill { background: linear-gradient(90deg, #4ecdc4, #44a08d); }
+        .ram-fill { background: linear-gradient(90deg, #a8edea, #fed6e3); }
+        .storage-fill { background: linear-gradient(90deg, #ffeaa7, #fab1a0); }
+        .temp-fill { background: linear-gradient(90deg, #74b9ff, #0984e3); }
+
+        .large-card {
+            grid-column: span 2;
+        }
+
+        .temp-gauge {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .temp-range {
+            text-align: center;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .performance-indicator {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .excellent { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .good { background: rgba(255, 235, 59, 0.2); color: #ffeb3b; }
+        .fair { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .poor { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+        .last-update {
+            text-align: center;
+            margin-top: 2rem;
+            color: #b0b0b0;
+            font-size: 0.9rem;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .large-card {
+                grid-column: span 1;
+            }
+            .dashboard {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">⚡ PC Monitor Pro</div>
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span>Live Monitoring</span>
+        </div>
+    </header>
+
+    <div class="dashboard" id="dashboard">
+        <div class="error">Loading system metrics...</div>
+    </div>
+
+    <div class="last-update" id="lastUpdate">
+        Connecting to monitoring service...
+    </div>
+
+    <script>
+        let isConnected = true;
+        let isInitialized = false;
+
+        function getPerformanceClass(value, thresholds) {
+            if (value >= thresholds.excellent) return 'excellent';
+            if (value >= thresholds.good) return 'good';
+            if (value >= thresholds.fair) return 'fair';
+            return 'poor';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes >= 1024) {
+                return (bytes / 1024).toFixed(1) + ' GB';
+            }
+            return bytes + ' MB';
+        }
+
+        function updateElement(id, value) {
+            const element = document.getElementById(id);
+            if (element && element.textContent !== value) {
+                element.textContent = value;
+            }
+        }
+
+        function updateBar(id, percentage) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.width = percentage + '%';
+            }
+        }
+
+        function updatePerformanceIndicator(id, className, text) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.className = 'performance-indicator ' + className;
+                element.textContent = text;
+            }
+        }
+
+        function initializeDashboard() {
+            const dashboardHTML = `
+                    <!-- GPU Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🎮</div>
+                            <div class="card-title">Graphics Card (GPU)</div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">VRAM Usage</span>
+                            <span class="metric-value" id="gpu-vram-text">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill gpu-fill" id="gpu-vram-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Core Clock</span>
+                            <span class="metric-value" id="gpu-clock">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill gpu-fill" id="gpu-usage-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Temperature</span>
+                            <span class="metric-value"><span id="gpu-temp">--</span>°C <span class="performance-indicator good" id="gpu-temp-indicator">good</span></span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Utilization</span>
+                            <span class="metric-value" id="gpu-usage">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- CPU Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🔧</div>
+                            <div class="card-title">Processor (CPU)</div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Cores / Threads</span>
+                            <span class="metric-value" id="cpu-cores">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Utilization</span>
+                            <span class="metric-value" id="cpu-usage">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill cpu-fill" id="cpu-usage-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Clock Speed</span>
+                            <span class="metric-value" id="cpu-clock">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Temperature</span>
+                            <span class="metric-value"><span id="cpu-temp">--</span>°C <span class="performance-indicator good" id="cpu-temp-indicator">good</span></span>
+                        </div>
+                    </div>
+
+                    <!-- RAM Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">💾</div>
+                            <div class="card-title">Memory (RAM)</div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Usage</span>
+                            <span class="metric-value" id="ram-usage">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill ram-fill" id="ram-usage-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Speed</span>
+                            <span class="metric-value" id="ram-speed">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Storage Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">💿</div>
+                            <div class="card-title">Storage Performance</div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Sequential Read</span>
+                            <span class="metric-value" id="storage-read">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill storage-fill" id="storage-read-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Sequential Write</span>
+                            <span class="metric-value" id="storage-write">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill storage-fill" id="storage-write-bar"></div>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Random Read (4K)</span>
+                            <span class="metric-value" id="storage-read-iops">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Random Write (4K)</span>
+                            <span class="metric-value" id="storage-write-iops">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Power & Thermal Card (Large) -->
+                    <div class="card large-card">
+                        <div class="card-header">
+                            <div class="card-icon">⚡</div>
+                            <div class="card-title">Power & Thermal Management</div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div>
+                                <div class="metric-row">
+                                    <span class="metric-label">System Power</span>
+                                    <span class="metric-value" id="power-usage">Loading...</span>
+                                </div>
+                                <div class="metric-bar">
+                                    <div class="metric-fill temp-fill" id="power-usage-bar"></div>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">PSU Efficiency</span>
+                                    <span class="metric-value"><span id="power-efficiency">--</span>% <span class="performance-indicator excellent">80+ Gold</span></span>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="metric-row">
+                                    <span class="metric-label">CPU Power</span>
+                                    <span class="metric-value" id="power-cpu">Loading...</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">GPU Power</span>
+                                    <span class="metric-value" id="power-gpu">Loading...</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Case Temperature</span>
+                                    <span class="metric-value" id="case-temp">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="temp-gauge">
+                            <div class="temp-range">
+                                <div style="color: #4ecdc4;">Cool</div>
+                                <div>30°C</div>
+                            </div>
+                            <div class="temp-range">
+                                <div style="color: #00ff88;">Optimal</div>
+                                <div>50-70°C</div>
+                            </div>
+                            <div class="temp-range">
+                                <div style="color: #ff9800;">Warm</div>
+                                <div>80°C</div>
+                            </div>
+                            <div class="temp-range">
+                                <div style="color: #f44336;">Hot</div>
+                                <div>90°C+</div>
+                            </div>
+                        </div>
+
+                        <div class="metric-row" style="margin-top: 1rem;">
+                            <span class="metric-label">Fan Speeds</span>
+                            <span class="metric-value" id="fan-speeds">Loading...</span>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('dashboard').innerHTML = dashboardHTML;
+                isInitialized = true;
+        }
+
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                
+                // Update connection status
+                if (!isConnected) {
+                    isConnected = true;
+                    document.querySelector('.status-dot').style.background = '#00ff88';
+                }
+
+                // Initialize dashboard HTML if first time
+                if (!isInitialized) {
+                    initializeDashboard();
+                    return; // Skip update on first load, let initialization settle
+                }
+
+                // Calculate percentages and performance indicators
+                const vramPercent = (data.gpu.vram_used_mb / data.gpu.vram_total_mb * 100).toFixed(1);
+                const ramPercent = data.ram.utilization_percent.toFixed(1);
+                const powerPercent = (data.power.system_power_w / data.power.psu_wattage * 100).toFixed(1);
+
+                // Performance classifications
+                const cpuTempClass = getPerformanceClass(data.cpu.temperature_c, {excellent: 0, good: 50, fair: 75, poor: 85});
+                const gpuTempClass = getPerformanceClass(data.gpu.temperature_c, {excellent: 0, good: 60, fair: 80, poor: 90});
+
+                // Update all values without regenerating HTML
+                updateElement('gpu-vram-text', `${data.gpu.vram_used_mb} / ${data.gpu.vram_total_mb} MB (${vramPercent}%)`);
+                updateBar('gpu-vram-bar', vramPercent);
+                updateElement('gpu-clock', `${data.gpu.core_clock_mhz} MHz`);
+                updateBar('gpu-usage-bar', Math.min(data.gpu.utilization_percent, 100));
+                updateElement('gpu-temp', data.gpu.temperature_c);
+                updatePerformanceIndicator('gpu-temp-indicator', gpuTempClass, gpuTempClass);
+                updateElement('gpu-usage', `${data.gpu.utilization_percent}%`);
+
+                updateElement('cpu-cores', `${data.cpu.core_count} / ${data.cpu.thread_count}`);
+                updateElement('cpu-usage', `${data.cpu.utilization_percent}%`);
+                updateBar('cpu-usage-bar', Math.min(data.cpu.utilization_percent, 100));
+                updateElement('cpu-clock', `${data.cpu.current_clock_mhz} MHz`);
+                updateElement('cpu-temp', data.cpu.temperature_c);
+                updatePerformanceIndicator('cpu-temp-indicator', cpuTempClass, cpuTempClass);
+
+                updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)} (${ramPercent}%)`);
+                updateBar('ram-usage-bar', ramPercent);
+                updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
+
+                updateElement('storage-read', `${data.storage.seq_read_mbps} MB/s`);
+                updateBar('storage-read-bar', Math.min(data.storage.seq_read_mbps / 100, 100));
+                updateElement('storage-write', `${data.storage.seq_write_mbps} MB/s`);
+                updateBar('storage-write-bar', Math.min(data.storage.seq_write_mbps / 100, 100));
+                updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
+                updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
+
+                updateElement('power-usage', `${data.power.system_power_w}W / ${data.power.psu_wattage}W (${powerPercent}%)`);
+                updateBar('power-usage-bar', powerPercent);
+                updateElement('power-efficiency', data.power.efficiency_percent);
+                updateElement('power-cpu', `${data.power.cpu_power_w}W`);
+                updateElement('power-gpu', `${data.power.gpu_power_w}W`);
+                updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
+
+                if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
+                    updateElement('fan-speeds', `${data.thermal.fan_speeds_rpm.slice(0, 3).join(' / ')} RPM`);
+                }
+
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+                if (isConnected) {
+                    isConnected = false;
+                    document.querySelector('.status-dot').style.background = '#f44336';
+                    document.getElementById('dashboard').innerHTML = `
+                        <div class="error">
+                            ❌ Connection lost to monitoring service<br>
+                            <small>Error: ${error.message}</small>
+                        </div>
+                    `;
+                    document.getElementById('lastUpdate').textContent = `Connection lost at ${new Date().toLocaleTimeString()}`;
+                    isInitialized = false;
+                }
+            }
+        }
+
+        // Update every second
+        setInterval(updateMetrics, 1000);
+        
+        // Initial load
+        updateMetrics();
+
+        // No animations - static interface
+        document.addEventListener('DOMContentLoaded', function() {
+            // Dashboard loaded - no animations applied
+        });
+    </script>
+</body>
+</html>
