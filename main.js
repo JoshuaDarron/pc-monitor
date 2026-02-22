@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeTheme } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -31,6 +31,15 @@ function killBackend() {
   }
 }
 
+function getTitleBarOverlay() {
+  const isDark = nativeTheme.shouldUseDarkColors;
+  return {
+    color: '#00000000',
+    symbolColor: isDark ? '#b0b0b0' : '#666666',
+    height: 36,
+  };
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -41,11 +50,7 @@ function createWindow() {
     icon: path.join(__dirname, 'web', 'favicon.ico'),
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#b0b0b0',
-      height: 36,
-    },
+    titleBarOverlay: getTitleBarOverlay(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -59,6 +64,14 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+nativeTheme.on('updated', () => {
+  const isDark = nativeTheme.shouldUseDarkColors;
+  if (mainWindow) {
+    mainWindow.webContents.send('theme-changed', isDark);
+    mainWindow.setTitleBarOverlay(getTitleBarOverlay());
+  }
+});
 
 app.whenReady().then(() => {
   spawnBackend();
