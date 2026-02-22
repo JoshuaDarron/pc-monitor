@@ -24,9 +24,15 @@
             backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             padding: 1rem 2rem;
+            padding-top: calc(1rem + env(titlebar-area-height, 0px));
             display: flex;
             justify-content: space-between;
             align-items: center;
+            -webkit-app-region: drag;
+        }
+
+        .header * {
+            -webkit-app-region: no-drag;
         }
 
         .logo {

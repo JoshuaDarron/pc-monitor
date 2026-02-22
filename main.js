@@ -40,6 +40,12 @@ function createWindow() {
     title: 'PC Monitor Pro',
     icon: path.join(__dirname, 'web', 'favicon.ico'),
     autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0f0f23',
+      symbolColor: '#ffffff',
+      height: 36,
+    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
