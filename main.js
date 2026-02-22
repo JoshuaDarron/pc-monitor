@@ -39,6 +39,7 @@ function createWindow() {
     minHeight: 600,
     title: 'PC Monitor Pro',
     icon: path.join(__dirname, 'web', 'favicon.ico'),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
