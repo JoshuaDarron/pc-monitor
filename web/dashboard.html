@@ -17,14 +17,17 @@
             color: #ffffff;
             min-height: 100vh;
             overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.15) #0f0f23;
         }
 
         ::-webkit-scrollbar {
             width: 8px;
+            background: #0f0f23;
         }
 
         ::-webkit-scrollbar-track {
-            background: transparent;
+            background: #0f0f23;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -36,47 +39,15 @@
             background: rgba(255, 255, 255, 0.25);
         }
 
-        .header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 1rem 2rem;
-            padding-top: calc(1rem + env(titlebar-area-height, 0px));
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        html {
+            background: #0f0f23;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.15) #0f0f23;
+        }
+
+        .drag-region {
+            height: 36px;
             -webkit-app-region: drag;
-        }
-
-        .header * {
-            -webkit-app-region: no-drag;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #00ff88;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         .dashboard {
@@ -238,13 +209,7 @@
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="logo">⚡ PC Monitor Pro</div>
-        <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span>Live Monitoring</span>
-        </div>
-    </header>
+    <div class="drag-region"></div>
 
     <div class="dashboard" id="dashboard">
         <div class="error">Loading system metrics...</div>
