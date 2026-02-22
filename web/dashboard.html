@@ -231,6 +231,144 @@
             text-align: center;
         }
 
+        /* Half-circle temperature gauge */
+        .gauge-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .half-gauge-svg {
+            width: 140px;
+            height: 85px;
+            overflow: visible;
+        }
+
+        .half-gauge-bg {
+            fill: none;
+            stroke: var(--bar-bg);
+            stroke-width: 10;
+            stroke-linecap: round;
+        }
+
+        .half-gauge-fill {
+            fill: none;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease, stroke 0.5s ease;
+        }
+
+        .gauge-value-text {
+            font-size: 1.3rem;
+            font-weight: 700;
+            fill: var(--text-primary);
+            text-anchor: middle;
+        }
+
+        .gauge-label-text {
+            font-size: 0.7rem;
+            fill: var(--text-secondary);
+            text-anchor: middle;
+        }
+
+        /* Small half-gauge variant for Power & Thermal card */
+        .half-gauge-svg.small {
+            width: 110px;
+            height: 70px;
+        }
+
+        /* Utilization history area chart */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 100px;
+            background: var(--gauge-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .chart-container canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .chart-label {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .chart-value {
+            position: absolute;
+            top: 4px;
+            right: 10px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            pointer-events: none;
+        }
+
+        /* Circular clock speed gauge */
+        .clock-gauge-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .clock-gauge-svg {
+            width: 120px;
+            height: 120px;
+            overflow: visible;
+        }
+
+        .clock-gauge-bg {
+            fill: none;
+            stroke: var(--bar-bg);
+            stroke-width: 8;
+            stroke-linecap: round;
+        }
+
+        .clock-gauge-fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .clock-value-text {
+            font-size: 1.1rem;
+            font-weight: 700;
+            fill: var(--text-primary);
+            text-anchor: middle;
+        }
+
+        .clock-unit-text {
+            font-size: 0.65rem;
+            fill: var(--text-secondary);
+            text-anchor: middle;
+        }
+
+        .clock-label-text {
+            font-size: 0.7rem;
+            fill: var(--text-secondary);
+            text-anchor: middle;
+        }
+
+        /* Gauge row — side-by-side gauge pairs */
+        .gauge-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-top: 0.75rem;
+            margin-top: 0.75rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
         @media (max-width: 900px) {
             .large-card {
                 grid-column: span 1;
@@ -269,6 +407,27 @@
 
         let isConnected = true;
         let isInitialized = false;
+
+        // History buffers for utilization area charts (60 entries = 1 minute at 1s polling)
+        const utilizationHistory = { gpu: [], cpu: [], ram: [] };
+
+        // Clock speed max tracker with sensible defaults, auto-expands
+        const clockMaxTracker = { gpu: 2500, cpu: 5500 };
+
+        // Chart gradient color sets
+        const chartColors = {
+            gpu: { line: 'rgba(255, 107, 107, 0.9)', top: 'rgba(255, 107, 107, 0.5)', bottom: 'rgba(255, 107, 107, 0.02)' },
+            cpu: { line: 'rgba(78, 205, 196, 0.9)', top: 'rgba(78, 205, 196, 0.5)', bottom: 'rgba(78, 205, 196, 0.02)' },
+            ram: { line: 'rgba(168, 237, 234, 0.9)', top: 'rgba(168, 237, 234, 0.5)', bottom: 'rgba(168, 237, 234, 0.02)' }
+        };
+
+        // Canvas context cache
+        const canvasContextCache = new Map();
+
+        function pushHistory(arr, value) {
+            arr.push(value);
+            if (arr.length > 60) arr.shift();
+        }
 
         function getPerformanceClass(value, thresholds) {
             if (value >= thresholds.excellent) return 'excellent';
@@ -318,6 +477,185 @@
             }
         }
 
+        // --- Half-circle temperature gauge ---
+        const HALF_GAUGE_ARC_LENGTH = 172.79;
+
+        function updateHalfGauge(fillId, textId, tempC, min, max) {
+            if (min === undefined) min = 30;
+            if (max === undefined) max = 100;
+            const fill = getCachedElement(fillId);
+            const text = getCachedElement(textId);
+            if (!fill || !text) return;
+
+            const fraction = Math.max(0, Math.min(1, (tempC - min) / (max - min)));
+            const offset = HALF_GAUGE_ARC_LENGTH * (1 - fraction);
+            fill.style.strokeDashoffset = offset;
+
+            // Color zones
+            let color;
+            if (tempC < 50) color = '#4ecdc4';
+            else if (tempC < 70) color = '#00ff88';
+            else if (tempC < 85) color = '#ffeb3b';
+            else color = '#f44336';
+            fill.style.stroke = color;
+
+            text.textContent = tempC + '°C';
+        }
+
+        // --- Utilization history area chart (canvas) ---
+        function setupCanvasDPI(canvasId) {
+            const canvas = getCachedElement(canvasId);
+            if (!canvas) return null;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            const w = Math.round(rect.width);
+            const h = Math.round(rect.height);
+            if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+                canvas.width = w * dpr;
+                canvas.height = h * dpr;
+                canvasContextCache.delete(canvasId);
+            }
+            let ctx = canvasContextCache.get(canvasId);
+            if (!ctx) {
+                ctx = canvas.getContext('2d');
+                canvasContextCache.set(canvasId, ctx);
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { ctx, w, h };
+        }
+
+        function drawAreaChart(canvasId, dataArray, colors, currentValue, valueElId) {
+            const setup = setupCanvasDPI(canvasId);
+            if (!setup) return;
+            const { ctx, w, h } = setup;
+
+            // Update the value overlay
+            if (valueElId) {
+                const valEl = getCachedElement(valueElId);
+                if (valEl) valEl.textContent = currentValue + '%';
+            }
+
+            ctx.clearRect(0, 0, w, h);
+            if (dataArray.length < 2) return;
+
+            const n = dataArray.length;
+            const padX = 0;
+            const padTop = 24;
+            const padBottom = 4;
+            const chartH = h - padTop - padBottom;
+            const stepX = (w - 2 * padX) / (60 - 1); // always 60-slot width
+            const offsetX = (60 - n) * stepX; // right-align data
+
+            // Build points
+            const pts = [];
+            for (let i = 0; i < n; i++) {
+                const x = padX + offsetX + i * stepX;
+                const y = padTop + chartH * (1 - Math.min(dataArray[i], 100) / 100);
+                pts.push({ x, y });
+            }
+
+            // Monotone cubic interpolation (Fritsch-Carlson)
+            const xs = pts.map(p => p.x);
+            const ys = pts.map(p => p.y);
+            const ms = monotoneCubicSlopes(xs, ys);
+
+            // Draw filled area with gradient
+            const gradient = ctx.createLinearGradient(0, padTop, 0, h);
+            gradient.addColorStop(0, colors.top);
+            gradient.addColorStop(1, colors.bottom);
+
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, h);
+            ctx.lineTo(pts[0].x, pts[0].y);
+            for (let i = 0; i < n - 1; i++) {
+                const dx = xs[i + 1] - xs[i];
+                const cx1 = xs[i] + dx / 3;
+                const cy1 = ys[i] + ms[i] * dx / 3;
+                const cx2 = xs[i + 1] - dx / 3;
+                const cy2 = ys[i + 1] - ms[i + 1] * dx / 3;
+                ctx.bezierCurveTo(cx1, cy1, cx2, cy2, xs[i + 1], ys[i + 1]);
+            }
+            ctx.lineTo(pts[n - 1].x, h);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Draw stroke line on top
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 0; i < n - 1; i++) {
+                const dx = xs[i + 1] - xs[i];
+                const cx1 = xs[i] + dx / 3;
+                const cy1 = ys[i] + ms[i] * dx / 3;
+                const cx2 = xs[i + 1] - dx / 3;
+                const cy2 = ys[i + 1] - ms[i + 1] * dx / 3;
+                ctx.bezierCurveTo(cx1, cy1, cx2, cy2, xs[i + 1], ys[i + 1]);
+            }
+            ctx.strokeStyle = colors.line;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function monotoneCubicSlopes(xs, ys) {
+            const n = xs.length;
+            const ds = [];
+            const ms = [];
+            for (let i = 0; i < n - 1; i++) {
+                const dx = xs[i + 1] - xs[i];
+                ds.push(dx === 0 ? 0 : (ys[i + 1] - ys[i]) / dx);
+            }
+            ms.push(ds[0] || 0);
+            for (let i = 1; i < n - 1; i++) {
+                if (ds[i - 1] * ds[i] <= 0) {
+                    ms.push(0);
+                } else {
+                    ms.push((ds[i - 1] + ds[i]) / 2);
+                }
+            }
+            ms.push(ds[n - 2] || 0);
+
+            // Fritsch-Carlson monotonicity correction
+            for (let i = 0; i < n - 1; i++) {
+                if (ds[i] === 0) {
+                    ms[i] = 0;
+                    ms[i + 1] = 0;
+                } else {
+                    const alpha = ms[i] / ds[i];
+                    const beta = ms[i + 1] / ds[i];
+                    const s = alpha * alpha + beta * beta;
+                    if (s > 9) {
+                        const t = 3 / Math.sqrt(s);
+                        ms[i] = t * alpha * ds[i];
+                        ms[i + 1] = t * beta * ds[i];
+                    }
+                }
+            }
+            return ms;
+        }
+
+        // --- Circular clock speed gauge ---
+        const CLOCK_ARC_LENGTH = 235.62; // 270° arc of circle r=50
+
+        function updateClockGauge(fillId, textId, clockMhz, maxKey) {
+            const fill = getCachedElement(fillId);
+            const text = getCachedElement(textId);
+            if (!fill || !text) return;
+
+            // Auto-expand max tracker
+            if (clockMhz * 1.1 > clockMaxTracker[maxKey]) {
+                clockMaxTracker[maxKey] = clockMhz * 1.1;
+            }
+
+            const fraction = Math.max(0, Math.min(1, clockMhz / clockMaxTracker[maxKey]));
+            const offset = CLOCK_ARC_LENGTH * (1 - fraction);
+            fill.style.strokeDashoffset = offset;
+
+            text.textContent = clockMhz;
+        }
+
+        // Clear canvas cache on resize
+        window.addEventListener('resize', () => { canvasContextCache.clear(); });
+
         function initializeDashboard() {
             const dashboardHTML = `
                     <!-- GPU Card -->
@@ -326,6 +664,11 @@
                             <div class="card-icon">🎮</div>
                             <div class="card-title">Graphics Card (GPU)</div>
                         </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="gpu-util-value">--%</span>
+                            <canvas id="gpu-util-chart"></canvas>
+                        </div>
                         <div class="metric-row">
                             <span class="metric-label">VRAM Usage</span>
                             <span class="metric-value" id="gpu-vram-text">Loading...</span>
@@ -333,20 +676,37 @@
                         <div class="metric-bar">
                             <div class="metric-fill gpu-fill" id="gpu-vram-bar"></div>
                         </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Core Clock</span>
-                            <span class="metric-value" id="gpu-clock">Loading...</span>
-                        </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill gpu-fill" id="gpu-usage-bar"></div>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Temperature</span>
-                            <span class="metric-value"><span id="gpu-temp">--</span>°C <span class="performance-indicator good" id="gpu-temp-indicator">good</span></span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Utilization</span>
-                            <span class="metric-value" id="gpu-usage">Loading...</span>
+                        <div class="gauge-row">
+                            <div class="gauge-container">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 85">
+                                    <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
+                                    <path class="half-gauge-fill" id="gpu-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
+                                          stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
+                                    <text class="gauge-value-text" x="70" y="62" id="gpu-temp-gauge-text">--°C</text>
+                                    <text class="gauge-label-text" x="70" y="80">Temperature</text>
+                                </svg>
+                            </div>
+                            <div class="clock-gauge-container">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                    <defs>
+                                        <linearGradient id="gpu-clock-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#ff6b6b"/>
+                                            <stop offset="100%" stop-color="#ff8e53"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            transform="rotate(135 60 60)" />
+                                    <circle class="clock-gauge-fill" id="gpu-clock-gauge-fill" cx="60" cy="60" r="50"
+                                            stroke="url(#gpu-clock-gradient)"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            stroke-dashoffset="${CLOCK_ARC_LENGTH}"
+                                            transform="rotate(135 60 60)" />
+                                    <text class="clock-value-text" x="60" y="58" id="gpu-clock-gauge-text">--</text>
+                                    <text class="clock-unit-text" x="60" y="72">MHz</text>
+                                    <text class="clock-label-text" x="60" y="95">Core Clock</text>
+                                </svg>
+                            </div>
                         </div>
                     </div>
 
@@ -356,24 +716,46 @@
                             <div class="card-icon">🔧</div>
                             <div class="card-title">Processor (CPU)</div>
                         </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="cpu-util-value">--%</span>
+                            <canvas id="cpu-util-chart"></canvas>
+                        </div>
                         <div class="metric-row">
                             <span class="metric-label">Cores / Threads</span>
                             <span class="metric-value" id="cpu-cores">Loading...</span>
                         </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Utilization</span>
-                            <span class="metric-value" id="cpu-usage">Loading...</span>
-                        </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill cpu-fill" id="cpu-usage-bar"></div>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Clock Speed</span>
-                            <span class="metric-value" id="cpu-clock">Loading...</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Temperature</span>
-                            <span class="metric-value"><span id="cpu-temp">--</span>°C <span class="performance-indicator good" id="cpu-temp-indicator">good</span></span>
+                        <div class="gauge-row">
+                            <div class="gauge-container">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 85">
+                                    <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
+                                    <path class="half-gauge-fill" id="cpu-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
+                                          stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
+                                    <text class="gauge-value-text" x="70" y="62" id="cpu-temp-gauge-text">--°C</text>
+                                    <text class="gauge-label-text" x="70" y="80">Temperature</text>
+                                </svg>
+                            </div>
+                            <div class="clock-gauge-container">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                    <defs>
+                                        <linearGradient id="cpu-clock-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#4ecdc4"/>
+                                            <stop offset="100%" stop-color="#44a08d"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            transform="rotate(135 60 60)" />
+                                    <circle class="clock-gauge-fill" id="cpu-clock-gauge-fill" cx="60" cy="60" r="50"
+                                            stroke="url(#cpu-clock-gradient)"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            stroke-dashoffset="${CLOCK_ARC_LENGTH}"
+                                            transform="rotate(135 60 60)" />
+                                    <text class="clock-value-text" x="60" y="58" id="cpu-clock-gauge-text">--</text>
+                                    <text class="clock-unit-text" x="60" y="72">MHz</text>
+                                    <text class="clock-label-text" x="60" y="95">Clock Speed</text>
+                                </svg>
+                            </div>
                         </div>
                     </div>
 
@@ -382,6 +764,11 @@
                         <div class="card-header">
                             <div class="card-icon">💾</div>
                             <div class="card-title">Memory (RAM)</div>
+                        </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="ram-util-value">--%</span>
+                            <canvas id="ram-util-chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Usage</span>
@@ -445,8 +832,6 @@
                                     <span class="metric-label">PSU Efficiency</span>
                                     <span class="metric-value"><span id="power-efficiency">--</span>% <span class="performance-indicator excellent">80+ Gold</span></span>
                                 </div>
-                            </div>
-                            <div>
                                 <div class="metric-row">
                                     <span class="metric-label">CPU Power</span>
                                     <span class="metric-value" id="power-cpu">Loading...</span>
@@ -455,40 +840,62 @@
                                     <span class="metric-label">GPU Power</span>
                                     <span class="metric-value" id="power-gpu">Loading...</span>
                                 </div>
+                            </div>
+                            <div>
+                                <div class="gauge-row" style="border-top: none; margin-top: 0; padding-top: 0;">
+                                    <div class="gauge-container">
+                                        <svg class="half-gauge-svg small" viewBox="0 0 140 85">
+                                            <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
+                                            <path class="half-gauge-fill" id="thermal-cpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
+                                                  stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
+                                            <text class="gauge-value-text" x="70" y="62" id="thermal-cpu-gauge-text">--°C</text>
+                                            <text class="gauge-label-text" x="70" y="80">CPU</text>
+                                        </svg>
+                                    </div>
+                                    <div class="gauge-container">
+                                        <svg class="half-gauge-svg small" viewBox="0 0 140 85">
+                                            <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
+                                            <path class="half-gauge-fill" id="thermal-gpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
+                                                  stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
+                                            <text class="gauge-value-text" x="70" y="62" id="thermal-gpu-gauge-text">--°C</text>
+                                            <text class="gauge-label-text" x="70" y="80">GPU</text>
+                                        </svg>
+                                    </div>
+                                </div>
                                 <div class="metric-row">
                                     <span class="metric-label">Case Temperature</span>
                                     <span class="metric-value" id="case-temp">Loading...</span>
                                 </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Fan Speeds</span>
+                                    <span class="metric-value" id="fan-speeds">Loading...</span>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <div class="temp-gauge">
                             <div class="temp-range">
                                 <div style="color: #4ecdc4;">Cool</div>
-                                <div>30°C</div>
+                                <div>&lt;50°C</div>
                             </div>
                             <div class="temp-range">
                                 <div style="color: #00ff88;">Optimal</div>
                                 <div>50-70°C</div>
                             </div>
                             <div class="temp-range">
-                                <div style="color: #ff9800;">Warm</div>
-                                <div>80°C</div>
+                                <div style="color: #ffeb3b;">Warm</div>
+                                <div>70-85°C</div>
                             </div>
                             <div class="temp-range">
                                 <div style="color: #f44336;">Hot</div>
-                                <div>90°C+</div>
+                                <div>85°C+</div>
                             </div>
-                        </div>
-
-                        <div class="metric-row" style="margin-top: 1rem;">
-                            <span class="metric-label">Fan Speeds</span>
-                            <span class="metric-value" id="fan-speeds">Loading...</span>
                         </div>
                     </div>
                 `;
                 document.getElementById('dashboard').innerHTML = dashboardHTML;
                 elementCache.clear(); // Invalidate cached refs after DOM rebuild
+                canvasContextCache.clear();
                 isInitialized = true;
         }
 
@@ -511,37 +918,44 @@
                     return; // Skip update on first load, let initialization settle
                 }
 
+                // Push utilization history and update clock max trackers
+                pushHistory(utilizationHistory.gpu, data.gpu.utilization_percent);
+                pushHistory(utilizationHistory.cpu, data.cpu.utilization_percent);
+                pushHistory(utilizationHistory.ram, data.ram.utilization_percent);
+                if (data.gpu.core_clock_mhz * 1.1 > clockMaxTracker.gpu) {
+                    clockMaxTracker.gpu = Math.round(data.gpu.core_clock_mhz * 1.1);
+                }
+                if (data.cpu.current_clock_mhz * 1.1 > clockMaxTracker.cpu) {
+                    clockMaxTracker.cpu = Math.round(data.cpu.current_clock_mhz * 1.1);
+                }
+
                 // Batch all DOM mutations into a single repaint
                 requestAnimationFrame(() => {
-                    // Calculate percentages and performance indicators
+                    // Calculate percentages
                     const vramPercent = (data.gpu.vram_used_mb / data.gpu.vram_total_mb * 100).toFixed(1);
                     const ramPercent = data.ram.utilization_percent.toFixed(1);
                     const powerPercent = (data.power.system_power_w / data.power.psu_wattage * 100).toFixed(1);
 
-                    // Performance classifications
-                    const cpuTempClass = getPerformanceClass(data.cpu.temperature_c, {excellent: 0, good: 50, fair: 75, poor: 85});
-                    const gpuTempClass = getPerformanceClass(data.gpu.temperature_c, {excellent: 0, good: 60, fair: 80, poor: 90});
-
-                    // Update all values without regenerating HTML
+                    // --- GPU card ---
+                    drawAreaChart('gpu-util-chart', utilizationHistory.gpu, chartColors.gpu, data.gpu.utilization_percent, 'gpu-util-value');
                     updateElement('gpu-vram-text', `${data.gpu.vram_used_mb} / ${data.gpu.vram_total_mb} MB (${vramPercent}%)`);
                     updateBar('gpu-vram-bar', vramPercent);
-                    updateElement('gpu-clock', `${data.gpu.core_clock_mhz} MHz`);
-                    updateBar('gpu-usage-bar', Math.min(data.gpu.utilization_percent, 100));
-                    updateElement('gpu-temp', data.gpu.temperature_c);
-                    updatePerformanceIndicator('gpu-temp-indicator', gpuTempClass, gpuTempClass);
-                    updateElement('gpu-usage', `${data.gpu.utilization_percent}%`);
+                    updateHalfGauge('gpu-temp-gauge-fill', 'gpu-temp-gauge-text', data.gpu.temperature_c, 30, 100);
+                    updateClockGauge('gpu-clock-gauge-fill', 'gpu-clock-gauge-text', data.gpu.core_clock_mhz, 'gpu');
 
+                    // --- CPU card ---
+                    drawAreaChart('cpu-util-chart', utilizationHistory.cpu, chartColors.cpu, data.cpu.utilization_percent, 'cpu-util-value');
                     updateElement('cpu-cores', `${data.cpu.core_count} / ${data.cpu.thread_count}`);
-                    updateElement('cpu-usage', `${data.cpu.utilization_percent}%`);
-                    updateBar('cpu-usage-bar', Math.min(data.cpu.utilization_percent, 100));
-                    updateElement('cpu-clock', `${data.cpu.current_clock_mhz} MHz`);
-                    updateElement('cpu-temp', data.cpu.temperature_c);
-                    updatePerformanceIndicator('cpu-temp-indicator', cpuTempClass, cpuTempClass);
+                    updateHalfGauge('cpu-temp-gauge-fill', 'cpu-temp-gauge-text', data.cpu.temperature_c, 30, 100);
+                    updateClockGauge('cpu-clock-gauge-fill', 'cpu-clock-gauge-text', data.cpu.current_clock_mhz, 'cpu');
 
+                    // --- RAM card ---
+                    drawAreaChart('ram-util-chart', utilizationHistory.ram, chartColors.ram, data.ram.utilization_percent, 'ram-util-value');
                     updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)} (${ramPercent}%)`);
                     updateBar('ram-usage-bar', ramPercent);
                     updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
 
+                    // --- Storage card (unchanged) ---
                     updateElement('storage-read', `${data.storage.seq_read_mbps} MB/s`);
                     updateBar('storage-read-bar', Math.min(data.storage.seq_read_mbps / 100, 100));
                     updateElement('storage-write', `${data.storage.seq_write_mbps} MB/s`);
@@ -549,11 +963,14 @@
                     updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
                     updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
 
+                    // --- Power & Thermal card ---
                     updateElement('power-usage', `${data.power.system_power_w}W / ${data.power.psu_wattage}W (${powerPercent}%)`);
                     updateBar('power-usage-bar', powerPercent);
                     updateElement('power-efficiency', data.power.efficiency_percent);
                     updateElement('power-cpu', `${data.power.cpu_power_w}W`);
                     updateElement('power-gpu', `${data.power.gpu_power_w}W`);
+                    updateHalfGauge('thermal-cpu-gauge-fill', 'thermal-cpu-gauge-text', data.cpu.temperature_c, 30, 100);
+                    updateHalfGauge('thermal-gpu-gauge-fill', 'thermal-gpu-gauge-text', data.gpu.temperature_c, 30, 100);
                     updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
 
                     if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
@@ -576,6 +993,7 @@
                     `;
                     document.getElementById('lastUpdate').textContent = `Connection lost at ${new Date().toLocaleTimeString()}`;
                     elementCache.clear();
+                    canvasContextCache.clear();
                     isInitialized = false;
                 }
             }
