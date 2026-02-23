@@ -3,7 +3,10 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const BACKEND_PORT = 8080;
-const BACKEND_EXE = path.join(__dirname, 'build', 'bin', 'Release', 'pc_monitor.exe');
+const isPackaged = app.isPackaged;
+const BACKEND_EXE = isPackaged
+  ? path.join(process.resourcesPath, 'backend', 'pc_monitor.exe')
+  : path.join(__dirname, 'build', 'bin', 'Release', 'pc_monitor.exe');
 
 let mainWindow = null;
 let backendProcess = null;
