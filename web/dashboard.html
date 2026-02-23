@@ -216,10 +216,10 @@
         .poor { background: rgba(244, 67, 54, 0.2); color: #f44336; }
 
         .last-update {
-            text-align: center;
-            margin-top: 2rem;
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+            padding: 0 2rem;
+            margin-bottom: -0.5rem;
         }
 
         .error {
@@ -383,12 +383,12 @@
 <body>
     <div class="drag-region"></div>
 
-    <div class="dashboard" id="dashboard">
-        <div class="error">Loading system metrics...</div>
-    </div>
-
     <div class="last-update" id="lastUpdate">
         Connecting to monitoring service...
+    </div>
+
+    <div class="dashboard" id="dashboard">
+        <div class="error">Loading system metrics...</div>
     </div>
 
     <script src="../renderer.js"></script>
