@@ -49,19 +49,20 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--bg-gradient);
             color: var(--text-primary);
-            min-height: 100vh;
+            height: 100%;
             overflow-x: hidden;
+            overflow-y: auto;
             scrollbar-width: thin;
-            scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+            scrollbar-color: var(--scrollbar-thumb) transparent;
         }
 
         ::-webkit-scrollbar {
             width: 8px;
-            background: var(--scrollbar-track);
+            background: transparent;
         }
 
         ::-webkit-scrollbar-track {
-            background: var(--scrollbar-track);
+            background: transparent;
         }
 
         ::-webkit-scrollbar-thumb {
@@ -75,8 +76,8 @@
 
         html {
             background: var(--bg-primary);
-            scrollbar-width: thin;
-            scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+            overflow: hidden;
+            height: 100%;
         }
 
         .drag-region {
