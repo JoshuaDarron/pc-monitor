@@ -4,6 +4,8 @@
 
 This high-performance PC monitoring application provides real-time hardware monitoring with a modern web-based dashboard. The backend is written in C++ for maximum performance and minimal resource usage.
 
+![Dashboard Screenshot](assets/screenshot.png)
+
 ## Project Structure
 
 ```
