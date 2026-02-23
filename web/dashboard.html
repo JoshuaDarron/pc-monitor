@@ -408,17 +408,25 @@
         let isConnected = true;
         let isInitialized = false;
 
-        // History buffers for utilization area charts (60 entries = 1 minute at 1s polling)
+        // History buffers for area charts (60 entries = 1 minute at 1s polling)
         const utilizationHistory = { gpu: [], cpu: [], ram: [] };
+        const storageHistory = { read: [], write: [] };
+        const powerHistory = [];
 
         // Clock speed max tracker with sensible defaults, auto-expands
         const clockMaxTracker = { gpu: 2500, cpu: 5500 };
+
+        // Auto-scaling max trackers for non-percentage charts
+        const chartMaxTracker = { storageRead: 100, storageWrite: 100, power: 200 };
 
         // Chart gradient color sets
         const chartColors = {
             gpu: { line: 'rgba(255, 107, 107, 0.9)', top: 'rgba(255, 107, 107, 0.5)', bottom: 'rgba(255, 107, 107, 0.02)' },
             cpu: { line: 'rgba(78, 205, 196, 0.9)', top: 'rgba(78, 205, 196, 0.5)', bottom: 'rgba(78, 205, 196, 0.02)' },
-            ram: { line: 'rgba(168, 237, 234, 0.9)', top: 'rgba(168, 237, 234, 0.5)', bottom: 'rgba(168, 237, 234, 0.02)' }
+            ram: { line: 'rgba(168, 237, 234, 0.9)', top: 'rgba(168, 237, 234, 0.5)', bottom: 'rgba(168, 237, 234, 0.02)' },
+            storageRead: { line: 'rgba(255, 234, 167, 0.9)', top: 'rgba(255, 234, 167, 0.5)', bottom: 'rgba(255, 234, 167, 0.02)' },
+            storageWrite: { line: 'rgba(250, 177, 160, 0.9)', top: 'rgba(250, 177, 160, 0.5)', bottom: 'rgba(250, 177, 160, 0.02)' },
+            power: { line: 'rgba(116, 185, 255, 0.9)', top: 'rgba(116, 185, 255, 0.5)', bottom: 'rgba(116, 185, 255, 0.02)' }
         };
 
         // Canvas context cache
@@ -524,7 +532,10 @@
             return { ctx, w, h };
         }
 
-        function drawAreaChart(canvasId, dataArray, colors, currentValue, valueElId) {
+        // drawAreaChart: maxValue defaults to 100 (percentage). Pass a higher value for auto-scaled charts.
+        function drawAreaChart(canvasId, dataArray, colors, currentValue, valueElId, valueSuffix, maxValue) {
+            if (!valueSuffix) valueSuffix = '%';
+            if (!maxValue) maxValue = 100;
             const setup = setupCanvasDPI(canvasId);
             if (!setup) return;
             const { ctx, w, h } = setup;
@@ -532,7 +543,7 @@
             // Update the value overlay
             if (valueElId) {
                 const valEl = getCachedElement(valueElId);
-                if (valEl) valEl.textContent = currentValue + '%';
+                if (valEl) valEl.textContent = currentValue + valueSuffix;
             }
 
             ctx.clearRect(0, 0, w, h);
@@ -550,7 +561,7 @@
             const pts = [];
             for (let i = 0; i < n; i++) {
                 const x = padX + offsetX + i * stepX;
-                const y = padTop + chartH * (1 - Math.min(dataArray[i], 100) / 100);
+                const y = padTop + chartH * (1 - Math.min(dataArray[i], maxValue) / maxValue);
                 pts.push({ x, y });
             }
 
@@ -789,19 +800,15 @@
                             <div class="card-icon">💿</div>
                             <div class="card-title">Storage Performance</div>
                         </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Sequential Read</span>
-                            <span class="metric-value" id="storage-read">Loading...</span>
+                        <div class="chart-container">
+                            <span class="chart-label">Sequential Read</span>
+                            <span class="chart-value" id="storage-read-value">-- MB/s</span>
+                            <canvas id="storage-read-chart"></canvas>
                         </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill storage-fill" id="storage-read-bar"></div>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Sequential Write</span>
-                            <span class="metric-value" id="storage-write">Loading...</span>
-                        </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill storage-fill" id="storage-write-bar"></div>
+                        <div class="chart-container">
+                            <span class="chart-label">Sequential Write</span>
+                            <span class="chart-value" id="storage-write-value">-- MB/s</span>
+                            <canvas id="storage-write-chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Random Read (4K)</span>
@@ -821,12 +828,10 @@
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
                             <div>
-                                <div class="metric-row">
-                                    <span class="metric-label">System Power</span>
-                                    <span class="metric-value" id="power-usage">Loading...</span>
-                                </div>
-                                <div class="metric-bar">
-                                    <div class="metric-fill temp-fill" id="power-usage-bar"></div>
+                                <div class="chart-container">
+                                    <span class="chart-label">System Power</span>
+                                    <span class="chart-value" id="power-usage-value">-- W</span>
+                                    <canvas id="power-usage-chart"></canvas>
                                 </div>
                                 <div class="metric-row">
                                     <span class="metric-label">PSU Efficiency</span>
@@ -922,6 +927,21 @@
                 pushHistory(utilizationHistory.gpu, data.gpu.utilization_percent);
                 pushHistory(utilizationHistory.cpu, data.cpu.utilization_percent);
                 pushHistory(utilizationHistory.ram, data.ram.utilization_percent);
+                pushHistory(storageHistory.read, data.storage.seq_read_mbps);
+                pushHistory(storageHistory.write, data.storage.seq_write_mbps);
+                pushHistory(powerHistory, data.power.system_power_w);
+
+                // Auto-scale storage and power chart maxes
+                if (data.storage.seq_read_mbps * 1.2 > chartMaxTracker.storageRead) {
+                    chartMaxTracker.storageRead = Math.round(data.storage.seq_read_mbps * 1.2);
+                }
+                if (data.storage.seq_write_mbps * 1.2 > chartMaxTracker.storageWrite) {
+                    chartMaxTracker.storageWrite = Math.round(data.storage.seq_write_mbps * 1.2);
+                }
+                if (data.power.system_power_w * 1.2 > chartMaxTracker.power) {
+                    chartMaxTracker.power = Math.round(data.power.system_power_w * 1.2);
+                }
+
                 if (data.gpu.core_clock_mhz * 1.1 > clockMaxTracker.gpu) {
                     clockMaxTracker.gpu = Math.round(data.gpu.core_clock_mhz * 1.1);
                 }
@@ -934,7 +954,6 @@
                     // Calculate percentages
                     const vramPercent = (data.gpu.vram_used_mb / data.gpu.vram_total_mb * 100).toFixed(1);
                     const ramPercent = data.ram.utilization_percent.toFixed(1);
-                    const powerPercent = (data.power.system_power_w / data.power.psu_wattage * 100).toFixed(1);
 
                     // --- GPU card ---
                     drawAreaChart('gpu-util-chart', utilizationHistory.gpu, chartColors.gpu, data.gpu.utilization_percent, 'gpu-util-value');
@@ -955,17 +974,14 @@
                     updateBar('ram-usage-bar', ramPercent);
                     updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
 
-                    // --- Storage card (unchanged) ---
-                    updateElement('storage-read', `${data.storage.seq_read_mbps} MB/s`);
-                    updateBar('storage-read-bar', Math.min(data.storage.seq_read_mbps / 100, 100));
-                    updateElement('storage-write', `${data.storage.seq_write_mbps} MB/s`);
-                    updateBar('storage-write-bar', Math.min(data.storage.seq_write_mbps / 100, 100));
+                    // --- Storage card ---
+                    drawAreaChart('storage-read-chart', storageHistory.read, chartColors.storageRead, data.storage.seq_read_mbps, 'storage-read-value', ' MB/s', chartMaxTracker.storageRead);
+                    drawAreaChart('storage-write-chart', storageHistory.write, chartColors.storageWrite, data.storage.seq_write_mbps, 'storage-write-value', ' MB/s', chartMaxTracker.storageWrite);
                     updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
                     updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
 
                     // --- Power & Thermal card ---
-                    updateElement('power-usage', `${data.power.system_power_w}W / ${data.power.psu_wattage}W (${powerPercent}%)`);
-                    updateBar('power-usage-bar', powerPercent);
+                    drawAreaChart('power-usage-chart', powerHistory, chartColors.power, data.power.system_power_w, 'power-usage-value', 'W', chartMaxTracker.power);
                     updateElement('power-efficiency', data.power.efficiency_percent);
                     updateElement('power-cpu', `${data.power.cpu_power_w}W`);
                     updateElement('power-gpu', `${data.power.gpu_power_w}W`);
