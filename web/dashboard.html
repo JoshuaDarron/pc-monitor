@@ -177,20 +177,6 @@
             grid-column: span 2;
         }
 
-        .temp-gauge {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 1rem;
-            padding: 0.5rem;
-            background: var(--gauge-bg);
-            border-radius: 8px;
-        }
-
-        .temp-range {
-            text-align: center;
-            font-size: 0.8rem;
-            opacity: 0.7;
-        }
 
         .performance-indicator {
             display: inline-block;
@@ -264,7 +250,7 @@
         /* Small half-gauge variant for Power & Thermal card */
         .half-gauge-svg.small {
             width: 110px;
-            height: 70px;
+            height: 78px;
         }
 
         /* Utilization history area chart */
@@ -478,7 +464,7 @@
         // --- Half-circle temperature gauge ---
         const HALF_GAUGE_ARC_LENGTH = 172.79;
 
-        function updateHalfGauge(fillId, textId, tempC, min, max) {
+        function updateHalfGauge(fillId, textId, tempC, min, max, statusId) {
             if (min === undefined) min = 30;
             if (max === undefined) max = 100;
             const fill = getCachedElement(fillId);
@@ -490,14 +476,22 @@
             fill.style.strokeDashoffset = offset;
 
             // Color zones
-            let color;
-            if (tempC < 50) color = '#4ecdc4';
-            else if (tempC < 70) color = '#00ff88';
-            else if (tempC < 85) color = '#ffeb3b';
-            else color = '#f44336';
+            let color, label;
+            if (tempC < 50) { color = '#4ecdc4'; label = 'Cool'; }
+            else if (tempC < 70) { color = '#00ff88'; label = 'Optimal'; }
+            else if (tempC < 85) { color = '#ffeb3b'; label = 'Warm'; }
+            else { color = '#f44336'; label = 'Hot'; }
             fill.style.stroke = color;
 
             text.textContent = tempC + '°C';
+
+            if (statusId) {
+                const statusEl = getCachedElement(statusId);
+                if (statusEl) {
+                    statusEl.textContent = label;
+                    statusEl.style.fill = color;
+                }
+            }
         }
 
         // --- Utilization history area chart (canvas) ---
@@ -834,21 +828,23 @@
                             <div>
                                 <div class="gauge-row" style="border-top: none; margin-top: 0; padding-top: 0;">
                                     <div class="gauge-container">
-                                        <svg class="half-gauge-svg small" viewBox="0 0 140 85">
+                                        <svg class="half-gauge-svg small" viewBox="0 0 140 95">
                                             <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
                                             <path class="half-gauge-fill" id="thermal-cpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
                                                   stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
                                             <text class="gauge-value-text" x="70" y="62" id="thermal-cpu-gauge-text">--°C</text>
                                             <text class="gauge-label-text" x="70" y="80">CPU</text>
+                                            <text class="gauge-label-text" x="70" y="93" id="thermal-cpu-status-text">--</text>
                                         </svg>
                                     </div>
                                     <div class="gauge-container">
-                                        <svg class="half-gauge-svg small" viewBox="0 0 140 85">
+                                        <svg class="half-gauge-svg small" viewBox="0 0 140 95">
                                             <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
                                             <path class="half-gauge-fill" id="thermal-gpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
                                                   stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
                                             <text class="gauge-value-text" x="70" y="62" id="thermal-gpu-gauge-text">--°C</text>
                                             <text class="gauge-label-text" x="70" y="80">GPU</text>
+                                            <text class="gauge-label-text" x="70" y="93" id="thermal-gpu-status-text">--</text>
                                         </svg>
                                     </div>
                                 </div>
@@ -860,25 +856,6 @@
                                     <span class="metric-label">Fan Speeds</span>
                                     <span class="metric-value" id="fan-speeds">Loading...</span>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="temp-gauge">
-                            <div class="temp-range">
-                                <div style="color: #4ecdc4;">Cool</div>
-                                <div>&lt;50°C</div>
-                            </div>
-                            <div class="temp-range">
-                                <div style="color: #00ff88;">Optimal</div>
-                                <div>50-70°C</div>
-                            </div>
-                            <div class="temp-range">
-                                <div style="color: #ffeb3b;">Warm</div>
-                                <div>70-85°C</div>
-                            </div>
-                            <div class="temp-range">
-                                <div style="color: #f44336;">Hot</div>
-                                <div>85°C+</div>
                             </div>
                         </div>
                     </div>
@@ -970,8 +947,8 @@
                     updateElement('power-efficiency', data.power.efficiency_percent);
                     updateElement('power-cpu', `${data.power.cpu_power_w}W`);
                     updateElement('power-gpu', `${data.power.gpu_power_w}W`);
-                    updateHalfGauge('thermal-cpu-gauge-fill', 'thermal-cpu-gauge-text', data.cpu.temperature_c, 30, 100);
-                    updateHalfGauge('thermal-gpu-gauge-fill', 'thermal-gpu-gauge-text', data.gpu.temperature_c, 30, 100);
+                    updateHalfGauge('thermal-cpu-gauge-fill', 'thermal-cpu-gauge-text', data.cpu.temperature_c, 30, 100, 'thermal-cpu-status-text');
+                    updateHalfGauge('thermal-gpu-gauge-fill', 'thermal-gpu-gauge-text', data.gpu.temperature_c, 30, 100, 'thermal-gpu-status-text');
                     updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
 
                     if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
