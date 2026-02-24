@@ -761,8 +761,28 @@
                             <span class="metric-label">Usage</span>
                             <span class="metric-value" id="ram-usage">Loading...</span>
                         </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill ram-fill" id="ram-usage-bar"></div>
+                        <div class="gauge-row">
+                            <div class="clock-gauge-container">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                    <defs>
+                                        <linearGradient id="ram-usage-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#a8edea"/>
+                                            <stop offset="100%" stop-color="#fed6e3"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            transform="rotate(135 60 60)" />
+                                    <circle class="clock-gauge-fill" id="ram-usage-gauge-fill" cx="60" cy="60" r="50"
+                                            stroke="url(#ram-usage-gradient)"
+                                            stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
+                                            stroke-dashoffset="${CLOCK_ARC_LENGTH}"
+                                            transform="rotate(135 60 60)" />
+                                    <text class="clock-value-text" x="60" y="58" id="ram-usage-gauge-text">--</text>
+                                    <text class="clock-unit-text" x="60" y="72">%</text>
+                                    <text class="clock-label-text" x="60" y="95">Used</text>
+                                </svg>
+                            </div>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Speed</span>
@@ -940,8 +960,14 @@
 
                     // --- RAM card ---
                     drawAreaChart('ram-util-chart', utilizationHistory.ram, chartColors.ram, data.ram.utilization_percent, 'ram-util-value');
-                    updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)} (${ramPercent}%)`);
-                    updateBar('ram-usage-bar', ramPercent);
+                    updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)}`);
+                    const ramFill = getCachedElement('ram-usage-gauge-fill');
+                    const ramText = getCachedElement('ram-usage-gauge-text');
+                    if (ramFill && ramText) {
+                        const frac = Math.max(0, Math.min(1, data.ram.utilization_percent / 100));
+                        ramFill.style.strokeDashoffset = CLOCK_ARC_LENGTH * (1 - frac);
+                        ramText.textContent = ramPercent;
+                    }
                     updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
 
                     // --- Storage card ---
