@@ -173,10 +173,6 @@
         .storage-fill { background: linear-gradient(90deg, #ffeaa7, #fab1a0); }
         .temp-fill { background: linear-gradient(90deg, #74b9ff, #0984e3); }
 
-        .large-card {
-            grid-column: span 2;
-        }
-
 
         .performance-indicator {
             display: inline-block;
@@ -245,12 +241,6 @@
             font-size: 0.7rem;
             fill: var(--text-secondary);
             text-anchor: middle;
-        }
-
-        /* Small half-gauge variant for Power & Thermal card */
-        .half-gauge-svg.small {
-            width: 110px;
-            height: 78px;
         }
 
         /* Utilization history area chart */
@@ -346,9 +336,6 @@
         }
 
         @media (max-width: 900px) {
-            .large-card {
-                grid-column: span 1;
-            }
             .dashboard {
                 grid-template-columns: 1fr;
                 padding: 1rem;
@@ -800,63 +787,35 @@
                         </div>
                     </div>
 
-                    <!-- Power & Thermal Card (Large) -->
-                    <div class="card large-card">
+                    <!-- Power & Thermal Card -->
+                    <div class="card">
                         <div class="card-header">
                             <div class="card-title">Power & Thermal Management</div>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                            <div>
-                                <div class="chart-container">
-                                    <span class="chart-label">System Power</span>
-                                    <span class="chart-value" id="power-usage-value">-- W</span>
-                                    <canvas id="power-usage-chart"></canvas>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">PSU Efficiency</span>
-                                    <span class="metric-value"><span id="power-efficiency">--</span>% <span class="performance-indicator excellent">80+ Gold</span></span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">CPU Power</span>
-                                    <span class="metric-value" id="power-cpu">Loading...</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">GPU Power</span>
-                                    <span class="metric-value" id="power-gpu">Loading...</span>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="gauge-row" style="border-top: none; margin-top: 0; padding-top: 0;">
-                                    <div class="gauge-container">
-                                        <svg class="half-gauge-svg small" viewBox="0 0 140 95">
-                                            <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
-                                            <path class="half-gauge-fill" id="thermal-cpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
-                                                  stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
-                                            <text class="gauge-value-text" x="70" y="62" id="thermal-cpu-gauge-text">--°C</text>
-                                            <text class="gauge-label-text" x="70" y="80">CPU</text>
-                                            <text class="gauge-label-text" x="70" y="93" id="thermal-cpu-status-text">--</text>
-                                        </svg>
-                                    </div>
-                                    <div class="gauge-container">
-                                        <svg class="half-gauge-svg small" viewBox="0 0 140 95">
-                                            <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
-                                            <path class="half-gauge-fill" id="thermal-gpu-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
-                                                  stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
-                                            <text class="gauge-value-text" x="70" y="62" id="thermal-gpu-gauge-text">--°C</text>
-                                            <text class="gauge-label-text" x="70" y="80">GPU</text>
-                                            <text class="gauge-label-text" x="70" y="93" id="thermal-gpu-status-text">--</text>
-                                        </svg>
-                                    </div>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">Case Temperature</span>
-                                    <span class="metric-value" id="case-temp">Loading...</span>
-                                </div>
-                                <div class="metric-row">
-                                    <span class="metric-label">Fan Speeds</span>
-                                    <span class="metric-value" id="fan-speeds">Loading...</span>
-                                </div>
-                            </div>
+                        <div class="chart-container">
+                            <span class="chart-label">System Power</span>
+                            <span class="chart-value" id="power-usage-value">-- W</span>
+                            <canvas id="power-usage-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">PSU Efficiency</span>
+                            <span class="metric-value"><span id="power-efficiency">--</span>% <span class="performance-indicator excellent">80+ Gold</span></span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">CPU Power</span>
+                            <span class="metric-value" id="power-cpu">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">GPU Power</span>
+                            <span class="metric-value" id="power-gpu">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Case Temperature</span>
+                            <span class="metric-value" id="case-temp">Loading...</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Fan Speeds</span>
+                            <span class="metric-value" id="fan-speeds">Loading...</span>
                         </div>
                     </div>
                 `;
@@ -947,8 +906,6 @@
                     updateElement('power-efficiency', data.power.efficiency_percent);
                     updateElement('power-cpu', `${data.power.cpu_power_w}W`);
                     updateElement('power-gpu', `${data.power.gpu_power_w}W`);
-                    updateHalfGauge('thermal-cpu-gauge-fill', 'thermal-cpu-gauge-text', data.cpu.temperature_c, 30, 100, 'thermal-cpu-status-text');
-                    updateHalfGauge('thermal-gpu-gauge-fill', 'thermal-gpu-gauge-text', data.gpu.temperature_c, 30, 100, 'thermal-gpu-status-text');
                     updateElement('case-temp', `${data.thermal.case_temp_c}°C`);
 
                     if (data.thermal.fan_speeds_rpm && data.thermal.fan_speeds_rpm.length > 0) {
