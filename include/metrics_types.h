@@ -45,6 +45,13 @@ namespace PCMonitor {
         double health_percent;
     };
 
+    struct NetworkMetrics {
+        uint64_t download_speed_kbps;  // Current download KB/s
+        uint64_t upload_speed_kbps;    // Current upload KB/s
+        uint64_t total_received_mb;    // Total bytes received (session)
+        uint64_t total_sent_mb;        // Total bytes sent (session)
+    };
+
     struct PowerMetrics {
         uint32_t psu_wattage;
         uint32_t system_power_w;
@@ -66,6 +73,7 @@ namespace PCMonitor {
         CPUMetrics cpu;
         RAMMetrics ram;
         StorageMetrics storage;
+        NetworkMetrics network;
         PowerMetrics power;
         ThermalMetrics thermal;
     };

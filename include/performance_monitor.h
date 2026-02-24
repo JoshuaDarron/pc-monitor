@@ -55,8 +55,13 @@ namespace PCMonitor {
         CPUMetrics cpu_metrics_;
         RAMMetrics ram_metrics_;
         StorageMetrics storage_metrics_;
+        NetworkMetrics network_metrics_;
         PowerMetrics power_metrics_;
         ThermalMetrics thermal_metrics_;
+
+        // Network session totals (raw byte counters from PDH)
+        uint64_t total_bytes_received_;
+        uint64_t total_bytes_sent_;
 
         // Cached CPU topology (never changes at runtime)
         uint32_t cached_core_count_;
@@ -72,6 +77,7 @@ namespace PCMonitor {
         void CollectCPUMetrics();
         void CollectRAMMetrics();
         void CollectStorageMetrics();
+        void CollectNetworkMetrics();
         void CollectPowerMetrics();
         void CollectThermalMetrics();
         
@@ -91,6 +97,7 @@ namespace PCMonitor {
         const CPUMetrics& GetCPUMetrics() const { return cpu_metrics_; }
         const RAMMetrics& GetRAMMetrics() const { return ram_metrics_; }
         const StorageMetrics& GetStorageMetrics() const { return storage_metrics_; }
+        const NetworkMetrics& GetNetworkMetrics() const { return network_metrics_; }
         const PowerMetrics& GetPowerMetrics() const { return power_metrics_; }
         const ThermalMetrics& GetThermalMetrics() const { return thermal_metrics_; }
         

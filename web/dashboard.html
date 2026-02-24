@@ -171,6 +171,7 @@
         .cpu-fill { background: linear-gradient(90deg, #4ecdc4, #44a08d); }
         .ram-fill { background: linear-gradient(90deg, #a8edea, #fed6e3); }
         .storage-fill { background: linear-gradient(90deg, #ffeaa7, #fab1a0); }
+        .network-fill { background: linear-gradient(90deg, #a282f6, #c084fc); }
         .temp-fill { background: linear-gradient(90deg, #74b9ff, #0984e3); }
 
 
@@ -374,13 +375,14 @@
         // History buffers for area charts (60 entries = 1 minute at 1s polling)
         const utilizationHistory = { gpu: [], cpu: [], ram: [] };
         const storageHistory = { read: [], write: [] };
+        const networkHistory = { download: [], upload: [] };
         const powerHistory = [];
 
         // Clock speed max tracker with sensible defaults, auto-expands
         const clockMaxTracker = { gpu: 2500, cpu: 5500 };
 
         // Auto-scaling max trackers for non-percentage charts
-        const chartMaxTracker = { storageRead: 100, storageWrite: 100, power: 200 };
+        const chartMaxTracker = { storageRead: 100, storageWrite: 100, netDown: 100, netUp: 100, power: 200 };
 
         // Chart gradient color sets
         const chartColors = {
@@ -389,6 +391,8 @@
             ram: { line: 'rgba(168, 237, 234, 0.9)', top: 'rgba(168, 237, 234, 0.5)', bottom: 'rgba(168, 237, 234, 0.02)' },
             storageRead: { line: 'rgba(255, 234, 167, 0.9)', top: 'rgba(255, 234, 167, 0.5)', bottom: 'rgba(255, 234, 167, 0.02)' },
             storageWrite: { line: 'rgba(250, 177, 160, 0.9)', top: 'rgba(250, 177, 160, 0.5)', bottom: 'rgba(250, 177, 160, 0.02)' },
+            netDown: { line: 'rgba(162, 130, 246, 0.9)', top: 'rgba(162, 130, 246, 0.5)', bottom: 'rgba(162, 130, 246, 0.02)' },
+            netUp: { line: 'rgba(192, 132, 252, 0.9)', top: 'rgba(192, 132, 252, 0.5)', bottom: 'rgba(192, 132, 252, 0.02)' },
             power: { line: 'rgba(116, 185, 255, 0.9)', top: 'rgba(116, 185, 255, 0.5)', bottom: 'rgba(116, 185, 255, 0.02)' }
         };
 
@@ -787,6 +791,31 @@
                         </div>
                     </div>
 
+                    <!-- Network Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Network Activity</div>
+                        </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Download</span>
+                            <span class="chart-value" id="net-down-value">-- KB/s</span>
+                            <canvas id="net-down-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Total Downloaded</span>
+                            <span class="metric-value" id="net-total-recv">Loading...</span>
+                        </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Upload</span>
+                            <span class="chart-value" id="net-up-value">-- KB/s</span>
+                            <canvas id="net-up-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Total Uploaded</span>
+                            <span class="metric-value" id="net-total-sent">Loading...</span>
+                        </div>
+                    </div>
+
                     <!-- Power & Thermal Card -->
                     <div class="card">
                         <div class="card-header">
@@ -858,6 +887,8 @@
                 pushHistory(utilizationHistory.ram, data.ram.utilization_percent);
                 pushHistory(storageHistory.read, data.storage.seq_read_mbps);
                 pushHistory(storageHistory.write, data.storage.seq_write_mbps);
+                pushHistory(networkHistory.download, data.network.download_speed_kbps);
+                pushHistory(networkHistory.upload, data.network.upload_speed_kbps);
                 pushHistory(powerHistory, data.power.system_power_w);
 
                 // Auto-scale storage and power chart maxes
@@ -866,6 +897,12 @@
                 }
                 if (data.storage.seq_write_mbps * 1.2 > chartMaxTracker.storageWrite) {
                     chartMaxTracker.storageWrite = Math.round(data.storage.seq_write_mbps * 1.2);
+                }
+                if (data.network.download_speed_kbps * 1.2 > chartMaxTracker.netDown) {
+                    chartMaxTracker.netDown = Math.round(data.network.download_speed_kbps * 1.2);
+                }
+                if (data.network.upload_speed_kbps * 1.2 > chartMaxTracker.netUp) {
+                    chartMaxTracker.netUp = Math.round(data.network.upload_speed_kbps * 1.2);
                 }
                 if (data.power.system_power_w * 1.2 > chartMaxTracker.power) {
                     chartMaxTracker.power = Math.round(data.power.system_power_w * 1.2);
@@ -908,6 +945,12 @@
                     drawAreaChart('storage-write-chart', storageHistory.write, chartColors.storageWrite, data.storage.seq_write_mbps, 'storage-write-value', ' MB/s', chartMaxTracker.storageWrite);
                     updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
                     updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
+
+                    // --- Network card ---
+                    drawAreaChart('net-down-chart', networkHistory.download, chartColors.netDown, data.network.download_speed_kbps, 'net-down-value', ' KB/s', chartMaxTracker.netDown);
+                    drawAreaChart('net-up-chart', networkHistory.upload, chartColors.netUp, data.network.upload_speed_kbps, 'net-up-value', ' KB/s', chartMaxTracker.netUp);
+                    updateElement('net-total-recv', `${data.network.total_received_mb} MB`);
+                    updateElement('net-total-sent', `${data.network.total_sent_mb} MB`);
 
                     // --- Power & Thermal card ---
                     drawAreaChart('power-usage-chart', powerHistory, chartColors.power, data.power.system_power_w, 'power-usage-value', 'W', chartMaxTracker.power);

@@ -29,8 +29,11 @@ namespace PCMonitor {
         memset(&cpu_metrics_, 0, sizeof(cpu_metrics_));
         memset(&ram_metrics_, 0, sizeof(ram_metrics_));
         memset(&storage_metrics_, 0, sizeof(storage_metrics_));
+        memset(&network_metrics_, 0, sizeof(network_metrics_));
         memset(&power_metrics_, 0, sizeof(power_metrics_));
         memset(&thermal_metrics_, 0, sizeof(thermal_metrics_));
+        total_bytes_received_ = 0;
+        total_bytes_sent_ = 0;
     }
 
     PerformanceMonitor::~PerformanceMonitor() {
@@ -141,7 +144,14 @@ namespace PCMonitor {
         // CPU frequency counter
         PdhAddCounterW(cpu_query_, L"\\Processor Information(_Total)\\Processor Frequency", 0, &counter);
         performance_counters_["cpu_frequency"] = counter;
-        
+
+        // Network counters
+        PdhAddCounterW(cpu_query_, L"\\Network Interface(*)\\Bytes Received/sec", 0, &counter);
+        performance_counters_["net_recv"] = counter;
+
+        PdhAddCounterW(cpu_query_, L"\\Network Interface(*)\\Bytes Sent/sec", 0, &counter);
+        performance_counters_["net_send"] = counter;
+
         return true;
     }
 
@@ -337,6 +347,38 @@ namespace PCMonitor {
         storage_metrics_.health_percent = 98.5; // Good health
     }
 
+    void PerformanceMonitor::CollectNetworkMetrics() {
+        PDH_FMT_COUNTERVALUE counter_val;
+        uint64_t bytes_recv_sec = 0;
+        uint64_t bytes_sent_sec = 0;
+
+        // Bytes Received/sec (wildcard sums all interfaces)
+        auto it = performance_counters_.find("net_recv");
+        if (it != performance_counters_.end()) {
+            if (PdhGetFormattedCounterValue(it->second, PDH_FMT_LARGE, nullptr, &counter_val) == ERROR_SUCCESS) {
+                bytes_recv_sec = static_cast<uint64_t>(counter_val.largeValue);
+            }
+        }
+
+        // Bytes Sent/sec
+        it = performance_counters_.find("net_send");
+        if (it != performance_counters_.end()) {
+            if (PdhGetFormattedCounterValue(it->second, PDH_FMT_LARGE, nullptr, &counter_val) == ERROR_SUCCESS) {
+                bytes_sent_sec = static_cast<uint64_t>(counter_val.largeValue);
+            }
+        }
+
+        // Convert bytes/s to KB/s
+        network_metrics_.download_speed_kbps = bytes_recv_sec / 1024;
+        network_metrics_.upload_speed_kbps = bytes_sent_sec / 1024;
+
+        // Accumulate session totals (interval is ~1 second)
+        total_bytes_received_ += bytes_recv_sec;
+        total_bytes_sent_ += bytes_sent_sec;
+        network_metrics_.total_received_mb = total_bytes_received_ / (1024 * 1024);
+        network_metrics_.total_sent_mb = total_bytes_sent_ / (1024 * 1024);
+    }
+
     void PerformanceMonitor::CollectPowerMetrics() {
         // Power metrics estimation based on component usage
         power_metrics_.psu_wattage = 850; // From system specs
@@ -444,6 +486,7 @@ namespace PCMonitor {
             CollectCPUMetrics();
             CollectRAMMetrics();
             CollectStorageMetrics();
+            CollectNetworkMetrics();
             CollectPowerMetrics();
             CollectThermalMetrics();
             

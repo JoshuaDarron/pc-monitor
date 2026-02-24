@@ -51,6 +51,7 @@ std::string GenerateJsonResponse(const PCMonitor::PerformanceMonitor& monitor) {
     const auto& cpu = monitor.GetCPUMetrics();
     const auto& ram = monitor.GetRAMMetrics();
     const auto& storage = monitor.GetStorageMetrics();
+    const auto& network = monitor.GetNetworkMetrics();
     const auto& power = monitor.GetPowerMetrics();
     const auto& thermal = monitor.GetThermalMetrics();
 
@@ -85,6 +86,12 @@ std::string GenerateJsonResponse(const PCMonitor::PerformanceMonitor& monitor) {
     json += "    \"seq_write_mbps\": " + std::to_string(storage.seq_write_mbps) + ",\n";
     json += "    \"random_read_iops\": " + std::to_string(storage.random_read_iops) + ",\n";
     json += "    \"random_write_iops\": " + std::to_string(storage.random_write_iops) + "\n";
+    json += "  },\n";
+    json += "  \"network\": {\n";
+    json += "    \"download_speed_kbps\": " + std::to_string(network.download_speed_kbps) + ",\n";
+    json += "    \"upload_speed_kbps\": " + std::to_string(network.upload_speed_kbps) + ",\n";
+    json += "    \"total_received_mb\": " + std::to_string(network.total_received_mb) + ",\n";
+    json += "    \"total_sent_mb\": " + std::to_string(network.total_sent_mb) + "\n";
     json += "  },\n";
     json += "  \"power\": {\n";
     json += "    \"system_power_w\": " + std::to_string(power.system_power_w) + ",\n";
