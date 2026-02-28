@@ -329,9 +329,9 @@
             display: flex;
             justify-content: space-around;
             align-items: center;
-            padding-top: 0.75rem;
-            margin-top: 0.75rem;
-            border-top: 1px solid var(--border-subtle);
+            padding-bottom: 0.75rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
         @media (max-width: 900px) {
@@ -683,18 +683,6 @@
                         <div class="card-header">
                             <div class="card-title">Graphics Card (GPU)</div>
                         </div>
-                        <div class="chart-container">
-                            <span class="chart-label">Utilization</span>
-                            <span class="chart-value" id="gpu-util-value">--%</span>
-                            <canvas id="gpu-util-chart"></canvas>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">VRAM Usage</span>
-                            <span class="metric-value" id="gpu-vram-text">Loading...</span>
-                        </div>
-                        <div class="metric-bar">
-                            <div class="metric-fill" id="gpu-vram-bar"></div>
-                        </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
                                 <svg class="half-gauge-svg" viewBox="0 0 140 85">
@@ -721,21 +709,24 @@
                                 </svg>
                             </div>
                         </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="gpu-util-value">--%</span>
+                            <canvas id="gpu-util-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">VRAM Usage</span>
+                            <span class="metric-value" id="gpu-vram-text">Loading...</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-fill" id="gpu-vram-bar"></div>
+                        </div>
                     </div>
 
                     <!-- CPU Card -->
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">Processor (CPU)</div>
-                        </div>
-                        <div class="chart-container">
-                            <span class="chart-label">Utilization</span>
-                            <span class="chart-value" id="cpu-util-value">--%</span>
-                            <canvas id="cpu-util-chart"></canvas>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Cores / Threads</span>
-                            <span class="metric-value" id="cpu-cores">Loading...</span>
                         </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
@@ -763,21 +754,21 @@
                                 </svg>
                             </div>
                         </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="cpu-util-value">--%</span>
+                            <canvas id="cpu-util-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Cores / Threads</span>
+                            <span class="metric-value" id="cpu-cores">Loading...</span>
+                        </div>
                     </div>
 
                     <!-- RAM Card -->
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">Memory (RAM)</div>
-                        </div>
-                        <div class="chart-container">
-                            <span class="chart-label">Utilization</span>
-                            <span class="chart-value" id="ram-util-value">--%</span>
-                            <canvas id="ram-util-chart"></canvas>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Usage</span>
-                            <span class="metric-value" id="ram-usage">Loading...</span>
                         </div>
                         <div class="gauge-row">
                             <div class="clock-gauge-container">
@@ -795,6 +786,15 @@
                                     <text class="clock-label-text" x="60" y="95">Used</text>
                                 </svg>
                             </div>
+                        </div>
+                        <div class="chart-container">
+                            <span class="chart-label">Utilization</span>
+                            <span class="chart-value" id="ram-util-value">--%</span>
+                            <canvas id="ram-util-chart"></canvas>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Usage</span>
+                            <span class="metric-value" id="ram-usage">Loading...</span>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Speed</span>
@@ -857,6 +857,18 @@
                         <div class="card-header">
                             <div class="card-title">Power & Thermal Management</div>
                         </div>
+                        <div class="gauge-row">
+                            <div class="gauge-container">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 95">
+                                    <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
+                                    <path class="half-gauge-fill" id="case-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
+                                          stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
+                                    <text class="gauge-value-text" x="70" y="62" id="case-temp-gauge-text">--°C</text>
+                                    <text class="gauge-label-text" x="70" y="80">Case Temp</text>
+                                    <text class="gauge-label-text" x="70" y="93" id="case-temp-status-text">--</text>
+                                </svg>
+                            </div>
+                        </div>
                         <div class="chart-container">
                             <span class="chart-label">System Power</span>
                             <span class="chart-value" id="power-usage-value">-- W</span>
@@ -873,18 +885,6 @@
                         <div class="metric-row">
                             <span class="metric-label">GPU Power</span>
                             <span class="metric-value" id="power-gpu">Loading...</span>
-                        </div>
-                        <div class="gauge-row">
-                            <div class="gauge-container">
-                                <svg class="half-gauge-svg" viewBox="0 0 140 95">
-                                    <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
-                                    <path class="half-gauge-fill" id="case-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
-                                          stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
-                                    <text class="gauge-value-text" x="70" y="62" id="case-temp-gauge-text">--°C</text>
-                                    <text class="gauge-label-text" x="70" y="80">Case Temp</text>
-                                    <text class="gauge-label-text" x="70" y="93" id="case-temp-status-text">--</text>
-                                </svg>
-                            </div>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Fan Speeds</span>
