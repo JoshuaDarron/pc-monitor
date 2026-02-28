@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch:*)",
+      "Bash(git update-ref:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(cmake --build:*)",
+      "Bash(cmake:*)",
+      "Bash(wc:*)",
+      "Bash(cd:*)",
+      "Bash(start ms-settings:developers:*)",
+      "Bash(git:*)"
+    ]
+  }
+}
