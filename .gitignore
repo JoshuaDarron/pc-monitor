@@ -33,6 +33,9 @@ node_modules/
 dist/
 pnpm-debug.log*
 
+# Logs
+pc_monitor_log.csv
+
 # OS
 Thumbs.db
 Desktop.ini
