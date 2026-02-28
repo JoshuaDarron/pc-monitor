@@ -171,12 +171,6 @@
             border-radius: 4px;
         }
 
-        .gpu-fill { background: linear-gradient(90deg, #ff6b6b, #ff8e53); }
-        .cpu-fill { background: linear-gradient(90deg, #4ecdc4, #44a08d); }
-        .ram-fill { background: linear-gradient(90deg, #a8edea, #fed6e3); }
-        .storage-fill { background: linear-gradient(90deg, #ffeaa7, #fab1a0); }
-        .network-fill { background: linear-gradient(90deg, #a282f6, #c084fc); }
-        .temp-fill { background: linear-gradient(90deg, #74b9ff, #0984e3); }
 
 
         .performance-indicator {
@@ -187,9 +181,9 @@
             font-weight: 600;
         }
 
-        .excellent { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .excellent { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
         .good { background: rgba(255, 235, 59, 0.2); color: #ffeb3b; }
-        .fair { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .fair { background: rgba(255, 172, 47, 0.2); color: #ffac2f; }
         .poor { background: rgba(244, 67, 54, 0.2); color: #f44336; }
 
         .last-update {
@@ -308,7 +302,7 @@
             fill: none;
             stroke-width: 8;
             stroke-linecap: round;
-            transition: stroke-dashoffset 0.5s ease;
+            transition: stroke-dashoffset 0.5s ease, stroke 0.5s ease;
         }
 
         .clock-value-text {
@@ -388,17 +382,49 @@
         // Auto-scaling max trackers for non-percentage charts
         const chartMaxTracker = { storageRead: 100, storageWrite: 100, netDown: 100, netUp: 100, power: 200 };
 
-        // Chart gradient color sets
-        const chartColors = {
-            gpu: { line: 'rgba(255, 107, 107, 0.9)', top: 'rgba(255, 107, 107, 0.5)', bottom: 'rgba(255, 107, 107, 0.02)' },
-            cpu: { line: 'rgba(78, 205, 196, 0.9)', top: 'rgba(78, 205, 196, 0.5)', bottom: 'rgba(78, 205, 196, 0.02)' },
-            ram: { line: 'rgba(168, 237, 234, 0.9)', top: 'rgba(168, 237, 234, 0.5)', bottom: 'rgba(168, 237, 234, 0.02)' },
-            storageRead: { line: 'rgba(255, 234, 167, 0.9)', top: 'rgba(255, 234, 167, 0.5)', bottom: 'rgba(255, 234, 167, 0.02)' },
-            storageWrite: { line: 'rgba(250, 177, 160, 0.9)', top: 'rgba(250, 177, 160, 0.5)', bottom: 'rgba(250, 177, 160, 0.02)' },
-            netDown: { line: 'rgba(162, 130, 246, 0.9)', top: 'rgba(162, 130, 246, 0.5)', bottom: 'rgba(162, 130, 246, 0.02)' },
-            netUp: { line: 'rgba(192, 132, 252, 0.9)', top: 'rgba(192, 132, 252, 0.5)', bottom: 'rgba(192, 132, 252, 0.02)' },
-            power: { line: 'rgba(116, 185, 255, 0.9)', top: 'rgba(116, 185, 255, 0.5)', bottom: 'rgba(116, 185, 255, 0.02)' }
-        };
+        // Unified utilization color: blue (0%) → green (40%) → yellow (70%) → red (100%)
+        const colorStops = [
+            { pct: 0,   r: 66,  g: 165, b: 245 },  // blue  #42a5f5
+            { pct: 40,  r: 76,  g: 175, b: 80  },   // green #4caf50
+            { pct: 70,  r: 255, g: 235, b: 59  },   // yellow #ffeb3b
+            { pct: 100, r: 244, g: 67,  b: 54  }    // red   #f44336
+        ];
+
+        function getUtilizationColor(pct) {
+            pct = Math.max(0, Math.min(100, pct));
+            let lower = colorStops[0], upper = colorStops[colorStops.length - 1];
+            for (let i = 0; i < colorStops.length - 1; i++) {
+                if (pct >= colorStops[i].pct && pct <= colorStops[i + 1].pct) {
+                    lower = colorStops[i];
+                    upper = colorStops[i + 1];
+                    break;
+                }
+            }
+            const range = upper.pct - lower.pct;
+            const t = range === 0 ? 0 : (pct - lower.pct) / range;
+            const r = Math.round(lower.r + (upper.r - lower.r) * t);
+            const g = Math.round(lower.g + (upper.g - lower.g) * t);
+            const b = Math.round(lower.b + (upper.b - lower.b) * t);
+            return { r, g, b };
+        }
+
+        function utilizationRgba(pct, alpha) {
+            const c = getUtilizationColor(pct);
+            return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
+        }
+
+        function utilizationHex(pct) {
+            const c = getUtilizationColor(pct);
+            return '#' + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
+        function utilizationChartColors(pct) {
+            return {
+                line: utilizationRgba(pct, 0.9),
+                top: utilizationRgba(pct, 0.5),
+                bottom: utilizationRgba(pct, 0.02)
+            };
+        }
 
         // Canvas context cache
         const canvasContextCache = new Map();
@@ -445,6 +471,7 @@
             const element = getCachedElement(id);
             if (element) {
                 element.style.width = percentage + '%';
+                element.style.background = utilizationHex(percentage);
             }
         }
 
@@ -470,12 +497,9 @@
             const offset = HALF_GAUGE_ARC_LENGTH * (1 - fraction);
             fill.style.strokeDashoffset = offset;
 
-            // Color zones
-            let color, label;
-            if (tempC < 50) { color = '#4ecdc4'; label = 'Cool'; }
-            else if (tempC < 70) { color = '#00ff88'; label = 'Optimal'; }
-            else if (tempC < 85) { color = '#ffeb3b'; label = 'Warm'; }
-            else { color = '#f44336'; label = 'Hot'; }
+            // Unified dynamic color based on utilization percentage
+            const pct = fraction * 100;
+            const color = utilizationHex(pct);
             fill.style.stroke = color;
 
             text.textContent = tempC + '°C';
@@ -483,6 +507,11 @@
             if (statusId) {
                 const statusEl = getCachedElement(statusId);
                 if (statusEl) {
+                    let label;
+                    if (pct < 30) label = 'Cool';
+                    else if (pct < 55) label = 'Optimal';
+                    else if (pct < 80) label = 'Warm';
+                    else label = 'Hot';
                     statusEl.textContent = label;
                     statusEl.style.fill = color;
                 }
@@ -639,6 +668,7 @@
             const fraction = Math.max(0, Math.min(1, clockMhz / clockMaxTracker[maxKey]));
             const offset = CLOCK_ARC_LENGTH * (1 - fraction);
             fill.style.strokeDashoffset = offset;
+            fill.style.stroke = utilizationHex(fraction * 100);
 
             text.textContent = clockMhz;
         }
@@ -663,7 +693,7 @@
                             <span class="metric-value" id="gpu-vram-text">Loading...</span>
                         </div>
                         <div class="metric-bar">
-                            <div class="metric-fill gpu-fill" id="gpu-vram-bar"></div>
+                            <div class="metric-fill" id="gpu-vram-bar"></div>
                         </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
@@ -677,17 +707,11 @@
                             </div>
                             <div class="clock-gauge-container">
                                 <svg class="clock-gauge-svg" viewBox="0 0 120 120">
-                                    <defs>
-                                        <linearGradient id="gpu-clock-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stop-color="#ff6b6b"/>
-                                            <stop offset="100%" stop-color="#ff8e53"/>
-                                        </linearGradient>
-                                    </defs>
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
                                     <circle class="clock-gauge-fill" id="gpu-clock-gauge-fill" cx="60" cy="60" r="50"
-                                            stroke="url(#gpu-clock-gradient)"
+                                            stroke="#42a5f5"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             stroke-dashoffset="${CLOCK_ARC_LENGTH}"
                                             transform="rotate(135 60 60)" />
@@ -725,17 +749,11 @@
                             </div>
                             <div class="clock-gauge-container">
                                 <svg class="clock-gauge-svg" viewBox="0 0 120 120">
-                                    <defs>
-                                        <linearGradient id="cpu-clock-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stop-color="#4ecdc4"/>
-                                            <stop offset="100%" stop-color="#44a08d"/>
-                                        </linearGradient>
-                                    </defs>
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
                                     <circle class="clock-gauge-fill" id="cpu-clock-gauge-fill" cx="60" cy="60" r="50"
-                                            stroke="url(#cpu-clock-gradient)"
+                                            stroke="#42a5f5"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             stroke-dashoffset="${CLOCK_ARC_LENGTH}"
                                             transform="rotate(135 60 60)" />
@@ -764,17 +782,11 @@
                         <div class="gauge-row">
                             <div class="clock-gauge-container">
                                 <svg class="clock-gauge-svg" viewBox="0 0 120 120">
-                                    <defs>
-                                        <linearGradient id="ram-usage-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stop-color="#a8edea"/>
-                                            <stop offset="100%" stop-color="#fed6e3"/>
-                                        </linearGradient>
-                                    </defs>
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
                                     <circle class="clock-gauge-fill" id="ram-usage-gauge-fill" cx="60" cy="60" r="50"
-                                            stroke="url(#ram-usage-gradient)"
+                                            stroke="#42a5f5"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             stroke-dashoffset="${CLOCK_ARC_LENGTH}"
                                             transform="rotate(135 60 60)" />
@@ -946,44 +958,50 @@
                     const ramPercent = data.ram.utilization_percent.toFixed(1);
 
                     // --- GPU card ---
-                    drawAreaChart('gpu-util-chart', utilizationHistory.gpu, chartColors.gpu, data.gpu.utilization_percent, 'gpu-util-value');
+                    drawAreaChart('gpu-util-chart', utilizationHistory.gpu, utilizationChartColors(data.gpu.utilization_percent), data.gpu.utilization_percent, 'gpu-util-value');
                     updateElement('gpu-vram-text', `${data.gpu.vram_used_mb} / ${data.gpu.vram_total_mb} MB (${vramPercent}%)`);
                     updateBar('gpu-vram-bar', vramPercent);
                     updateHalfGauge('gpu-temp-gauge-fill', 'gpu-temp-gauge-text', data.gpu.temperature_c, 30, 100);
                     updateClockGauge('gpu-clock-gauge-fill', 'gpu-clock-gauge-text', data.gpu.core_clock_mhz, 'gpu');
 
                     // --- CPU card ---
-                    drawAreaChart('cpu-util-chart', utilizationHistory.cpu, chartColors.cpu, data.cpu.utilization_percent, 'cpu-util-value');
+                    drawAreaChart('cpu-util-chart', utilizationHistory.cpu, utilizationChartColors(data.cpu.utilization_percent), data.cpu.utilization_percent, 'cpu-util-value');
                     updateElement('cpu-cores', `${data.cpu.core_count} / ${data.cpu.thread_count}`);
                     updateHalfGauge('cpu-temp-gauge-fill', 'cpu-temp-gauge-text', data.cpu.temperature_c, 30, 100);
                     updateClockGauge('cpu-clock-gauge-fill', 'cpu-clock-gauge-text', data.cpu.current_clock_mhz, 'cpu');
 
                     // --- RAM card ---
-                    drawAreaChart('ram-util-chart', utilizationHistory.ram, chartColors.ram, data.ram.utilization_percent, 'ram-util-value');
+                    drawAreaChart('ram-util-chart', utilizationHistory.ram, utilizationChartColors(data.ram.utilization_percent), data.ram.utilization_percent, 'ram-util-value');
                     updateElement('ram-usage', `${formatBytes(data.ram.used_mb)} / ${formatBytes(data.ram.total_mb)}`);
                     const ramFill = getCachedElement('ram-usage-gauge-fill');
                     const ramText = getCachedElement('ram-usage-gauge-text');
                     if (ramFill && ramText) {
                         const frac = Math.max(0, Math.min(1, data.ram.utilization_percent / 100));
                         ramFill.style.strokeDashoffset = CLOCK_ARC_LENGTH * (1 - frac);
+                        ramFill.style.stroke = utilizationHex(data.ram.utilization_percent);
                         ramText.textContent = ramPercent;
                     }
                     updateElement('ram-speed', `DDR-${data.ram.speed_mhz}`);
 
                     // --- Storage card ---
-                    drawAreaChart('storage-read-chart', storageHistory.read, chartColors.storageRead, data.storage.seq_read_mbps, 'storage-read-value', ' MB/s', chartMaxTracker.storageRead);
-                    drawAreaChart('storage-write-chart', storageHistory.write, chartColors.storageWrite, data.storage.seq_write_mbps, 'storage-write-value', ' MB/s', chartMaxTracker.storageWrite);
+                    const storageReadPct = chartMaxTracker.storageRead > 0 ? (data.storage.seq_read_mbps / chartMaxTracker.storageRead * 100) : 0;
+                    const storageWritePct = chartMaxTracker.storageWrite > 0 ? (data.storage.seq_write_mbps / chartMaxTracker.storageWrite * 100) : 0;
+                    drawAreaChart('storage-read-chart', storageHistory.read, utilizationChartColors(storageReadPct), data.storage.seq_read_mbps, 'storage-read-value', ' MB/s', chartMaxTracker.storageRead);
+                    drawAreaChart('storage-write-chart', storageHistory.write, utilizationChartColors(storageWritePct), data.storage.seq_write_mbps, 'storage-write-value', ' MB/s', chartMaxTracker.storageWrite);
                     updateElement('storage-read-iops', `${(data.storage.random_read_iops / 1000).toFixed(0)}K IOPS`);
                     updateElement('storage-write-iops', `${(data.storage.random_write_iops / 1000).toFixed(0)}K IOPS`);
 
                     // --- Network card ---
-                    drawAreaChart('net-down-chart', networkHistory.download, chartColors.netDown, data.network.download_speed_kbps, 'net-down-value', ' KB/s', chartMaxTracker.netDown);
-                    drawAreaChart('net-up-chart', networkHistory.upload, chartColors.netUp, data.network.upload_speed_kbps, 'net-up-value', ' KB/s', chartMaxTracker.netUp);
+                    const netDownPct = chartMaxTracker.netDown > 0 ? (data.network.download_speed_kbps / chartMaxTracker.netDown * 100) : 0;
+                    const netUpPct = chartMaxTracker.netUp > 0 ? (data.network.upload_speed_kbps / chartMaxTracker.netUp * 100) : 0;
+                    drawAreaChart('net-down-chart', networkHistory.download, utilizationChartColors(netDownPct), data.network.download_speed_kbps, 'net-down-value', ' KB/s', chartMaxTracker.netDown);
+                    drawAreaChart('net-up-chart', networkHistory.upload, utilizationChartColors(netUpPct), data.network.upload_speed_kbps, 'net-up-value', ' KB/s', chartMaxTracker.netUp);
                     updateElement('net-total-recv', `${data.network.total_received_mb} MB`);
                     updateElement('net-total-sent', `${data.network.total_sent_mb} MB`);
 
                     // --- Power & Thermal card ---
-                    drawAreaChart('power-usage-chart', powerHistory, chartColors.power, data.power.system_power_w, 'power-usage-value', 'W', chartMaxTracker.power);
+                    const powerPct = chartMaxTracker.power > 0 ? (data.power.system_power_w / chartMaxTracker.power * 100) : 0;
+                    drawAreaChart('power-usage-chart', powerHistory, utilizationChartColors(powerPct), data.power.system_power_w, 'power-usage-value', 'W', chartMaxTracker.power);
                     updateElement('power-efficiency', data.power.efficiency_percent);
                     updateElement('power-cpu', `${data.power.cpu_power_w}W`);
                     updateElement('power-gpu', `${data.power.gpu_power_w}W`);
