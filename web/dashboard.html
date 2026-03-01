@@ -186,12 +186,6 @@
         .fair { background: rgba(255, 172, 47, 0.2); color: #ffac2f; }
         .poor { background: rgba(244, 67, 54, 0.2); color: #f44336; }
 
-        .last-update {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            padding: 0 2rem;
-            margin-bottom: -0.5rem;
-        }
 
         .error {
             background: var(--error-bg);
@@ -344,10 +338,6 @@
 </head>
 <body>
     <div class="drag-region"></div>
-
-    <div class="last-update" id="lastUpdate">
-        Connecting to monitoring service...
-    </div>
 
     <div class="dashboard" id="dashboard">
         <div class="error">Loading system metrics...</div>
@@ -1011,7 +1001,6 @@
                         updateElement('fan-speeds', `${data.thermal.fan_speeds_rpm.slice(0, 3).join(' / ')} RPM`);
                     }
 
-                    updateElement('lastUpdate', `Last updated: ${new Date().toLocaleTimeString()}`);
                 });
 
             } catch (error) {
@@ -1025,7 +1014,6 @@
                             <small>Error: ${error.message}</small>
                         </div>
                     `;
-                    document.getElementById('lastUpdate').textContent = `Connection lost at ${new Date().toLocaleTimeString()}`;
                     elementCache.clear();
                     canvasContextCache.clear();
                     isInitialized = false;
