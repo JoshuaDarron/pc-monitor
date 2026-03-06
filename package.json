@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -49,6 +50,7 @@
   },
   "devDependencies": {
     "electron": "^40.6.0",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "vitest": "^3.0.0"
   }
 }

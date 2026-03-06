@@ -12,6 +12,7 @@
 
 // Now we can include other headers
 #include "performance_monitor.h"
+#include "http_utils.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -38,12 +39,7 @@ void SignalHandler(int signal) {
     exit(0);
 }
 
-// Helper to format a double with 1 decimal place without ostringstream
-static std::string to_fixed1(double val) {
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%.1f", val);
-    return buf;
-}
+// to_fixed1 is now in http_utils.h
 
 // Generate JSON response with current metrics
 std::string GenerateJsonResponse(const PCMonitor::PerformanceMonitor& monitor) {
@@ -187,19 +183,7 @@ std::string ReadHTMLFile(const std::string& filename) {
     return content.str();
 }
 
-// Create HTTP response
-std::string CreateHTTPResponse(const std::string& content, const std::string& content_type = "text/html") {
-    std::string response;
-    response.reserve(256 + content.length());
-    response += "HTTP/1.1 200 OK\r\n";
-    response += "Content-Type: " + content_type + "\r\n";
-    response += "Content-Length: " + std::to_string(content.length()) + "\r\n";
-    response += "Access-Control-Allow-Origin: *\r\n";
-    response += "Cache-Control: no-cache\r\n";
-    response += "\r\n";
-    response += content;
-    return response;
-}
+// CreateHTTPResponse is now in http_utils.h
 
 // Handle HTTP request
 std::string HandleRequest(const std::string& request, const PCMonitor::PerformanceMonitor& monitor) {

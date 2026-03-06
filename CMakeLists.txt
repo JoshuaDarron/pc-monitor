@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(PCPerformanceMonitor VERSION 1.0.0 LANGUAGES CXX)
 
+option(BUILD_TESTS "Build unit tests" ON)
+
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -176,6 +178,46 @@ install(TARGETS pc_monitor
 )
 
 install(FILES ${HEADERS} DESTINATION include/pc_monitor)
+
+# Unit tests
+if(BUILD_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+    )
+    # Prevent GoogleTest from overriding our compiler/linker settings on Windows
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    enable_testing()
+
+    add_executable(pc_monitor_tests
+        tests/test_power_monitor.cpp
+        tests/test_data_logger.cpp
+        tests/test_main_functions.cpp
+        ${SOURCES}
+    )
+
+    target_include_directories(pc_monitor_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(pc_monitor_tests
+        GTest::gtest_main
+        Threads::Threads
+        ${WINDOWS_LIBS}
+    )
+
+    if(NVML_FOUND)
+        target_link_libraries(pc_monitor_tests ${NVML_LIBRARY})
+        target_compile_definitions(pc_monitor_tests PRIVATE NVML_AVAILABLE)
+    endif()
+
+    include(GoogleTest)
+    gtest_discover_tests(pc_monitor_tests)
+endif()
 
 # Print configuration summary
 message(STATUS "")

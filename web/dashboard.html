@@ -344,6 +344,7 @@
     </div>
 
     <script src="../renderer.js"></script>
+    <script src="utils.js"></script>
     <script>
         function applyTheme(isDark) {
             document.body.classList.toggle('dark-theme', isDark);
@@ -419,24 +420,7 @@
         // Canvas context cache
         const canvasContextCache = new Map();
 
-        function pushHistory(arr, value) {
-            arr.push(value);
-            if (arr.length > 60) arr.shift();
-        }
-
-        function getPerformanceClass(value, thresholds) {
-            if (value >= thresholds.excellent) return 'excellent';
-            if (value >= thresholds.good) return 'good';
-            if (value >= thresholds.fair) return 'fair';
-            return 'poor';
-        }
-
-        function formatBytes(bytes) {
-            if (bytes >= 1024) {
-                return (bytes / 1024).toFixed(1) + ' GB';
-            }
-            return bytes + ' MB';
-        }
+        // pushHistory, getPerformanceClass, formatBytes are loaded from utils.js
 
         // Element reference cache — avoids repeated getElementById calls
         const elementCache = new Map();
