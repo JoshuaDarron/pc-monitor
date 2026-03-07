@@ -126,31 +126,31 @@ namespace PCMonitor {
         
         // Add additional performance counters
         PDH_HCOUNTER counter;
-        
+
+        auto addCounter = [&](const wchar_t* path, const std::string& name) {
+            PDH_STATUS s = PdhAddCounterW(cpu_query_, path, 0, &counter);
+            if (s != ERROR_SUCCESS) {
+                std::cerr << "Warning: failed to add PDH counter '" << name << "' (0x"
+                          << std::hex << s << std::dec << ")" << std::endl;
+                return;
+            }
+            performance_counters_[name] = counter;
+        };
+
         // Memory counters
-        PdhAddCounterW(cpu_query_, L"\\Memory\\Available MBytes", 0, &counter);
-        performance_counters_["memory_available"] = counter;
-        
-        PdhAddCounterW(cpu_query_, L"\\Memory\\Committed Bytes", 0, &counter);
-        performance_counters_["memory_committed"] = counter;
-        
+        addCounter(L"\\Memory\\Available MBytes", "memory_available");
+        addCounter(L"\\Memory\\Committed Bytes", "memory_committed");
+
         // Disk counters
-        PdhAddCounterW(cpu_query_, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", 0, &counter);
-        performance_counters_["disk_read"] = counter;
-        
-        PdhAddCounterW(cpu_query_, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", 0, &counter);
-        performance_counters_["disk_write"] = counter;
-        
+        addCounter(L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", "disk_read");
+        addCounter(L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", "disk_write");
+
         // CPU frequency counter
-        PdhAddCounterW(cpu_query_, L"\\Processor Information(_Total)\\Processor Frequency", 0, &counter);
-        performance_counters_["cpu_frequency"] = counter;
+        addCounter(L"\\Processor Information(_Total)\\Processor Frequency", "cpu_frequency");
 
         // Network counters
-        PdhAddCounterW(cpu_query_, L"\\Network Interface(*)\\Bytes Received/sec", 0, &counter);
-        performance_counters_["net_recv"] = counter;
-
-        PdhAddCounterW(cpu_query_, L"\\Network Interface(*)\\Bytes Sent/sec", 0, &counter);
-        performance_counters_["net_send"] = counter;
+        addCounter(L"\\Network Interface(*)\\Bytes Received/sec", "net_recv");
+        addCounter(L"\\Network Interface(*)\\Bytes Sent/sec", "net_send");
 
         return true;
     }
@@ -454,8 +454,10 @@ namespace PCMonitor {
         
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
-        
-        log_file_ << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << ","
+        struct tm tm_buf;
+        localtime_s(&tm_buf, &time_t);
+
+        log_file_ << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S") << ","
                   << gpu_metrics_.vram_used_mb << ","
                   << gpu_metrics_.core_clock_mhz << ","
                   << gpu_metrics_.temperature_c << ","
@@ -530,10 +532,15 @@ namespace PCMonitor {
     }
 
     void PerformanceMonitor::SetLogFile(const std::string& filename) {
+        if (running_) {
+            std::cerr << "Cannot change log file while monitoring is active" << std::endl;
+            return;
+        }
+
         if (log_file_.is_open()) {
             log_file_.close();
         }
-        
+
         log_file_.open(filename, std::ios::app);
     }
 

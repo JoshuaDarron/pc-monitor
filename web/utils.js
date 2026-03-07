@@ -24,13 +24,15 @@ function getPerformanceClass(value, thresholds) {
 }
 
 /**
- * Push a value onto a history array, keeping at most 60 entries.
+ * Push a value onto a history array, keeping at most maxSize entries.
  * @param {Array} arr - History array (mutated in place)
  * @param {*} value - Value to append
+ * @param {number} [maxSize=60] - Maximum buffer length
  */
-function pushHistory(arr, value) {
+function pushHistory(arr, value, maxSize) {
+    if (maxSize === undefined) maxSize = 60;
     arr.push(value);
-    if (arr.length > 60) arr.shift();
+    if (arr.length > maxSize) arr.shift();
 }
 
 // Export for testing (Node/Vitest), no-op in browser

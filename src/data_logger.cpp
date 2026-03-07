@@ -70,7 +70,7 @@ namespace PCMonitor {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             queue_cv_.wait(lock, [this] { return !log_queue_.empty() || !logging_active_; });
             
-            while (!log_queue_.empty() && logging_active_) {
+            while (!log_queue_.empty()) {
                 LogEntry entry = log_queue_.front();
                 log_queue_.pop();
                 lock.unlock();
@@ -96,8 +96,10 @@ namespace PCMonitor {
     std::string DataLogger::FormatLogEntry(const LogEntry& entry) {
         std::ostringstream oss;
         auto time_t = std::chrono::system_clock::to_time_t(entry.timestamp);
-        
-        oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << ","
+        struct tm tm_buf;
+        localtime_s(&tm_buf, &time_t);
+
+        oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S") << ","
             << std::fixed << std::setprecision(2) << entry.metrics.ram.utilization_percent << ","
             << entry.metrics.ram.used_mb << ","
             << entry.metrics.storage.seq_read_mbps << ","
@@ -126,8 +128,10 @@ namespace PCMonitor {
         // Create timestamped backup
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
+        struct tm tm_buf;
+        localtime_s(&tm_buf, &time_t);
         std::ostringstream backup_name;
-        backup_name << log_path_ << "." << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+        backup_name << log_path_ << "." << std::put_time(&tm_buf, "%Y%m%d_%H%M%S");
         
         try {
             std::filesystem::rename(log_path_, backup_name.str());

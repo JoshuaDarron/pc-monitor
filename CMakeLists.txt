@@ -97,19 +97,13 @@ endif()
 # Source files
 set(SOURCES
     src/performance_monitor.cpp
-    src/thermal_monitor.cpp
-    src/power_monitor.cpp
     src/data_logger.cpp
-    src/web_interface.cpp
 )
 
 set(HEADERS
     include/performance_monitor.h
     include/metrics_types.h
     include/data_logger.h
-    include/thermal_monitor.h
-    include/power_monitor.h
-    include/web_interface.h
 )
 
 # Create main executable
@@ -193,7 +187,6 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_executable(pc_monitor_tests
-        tests/test_power_monitor.cpp
         tests/test_data_logger.cpp
         tests/test_main_functions.cpp
         ${SOURCES}

@@ -25,15 +25,16 @@
 #pragma comment(lib, "ws2_32.lib")
 
 // Global variables
-PCMonitor::PerformanceMonitor* g_monitor = nullptr;
+std::atomic<PCMonitor::PerformanceMonitor*> g_monitor(nullptr);
 std::atomic<bool> g_web_server_running(false);
 
 // Signal handler for graceful shutdown (Ctrl+C)
 void SignalHandler(int signal) {
     std::cout << "\n\nReceived interrupt signal. Shutting down gracefully..." << std::endl;
-    g_web_server_running = false;
-    if (g_monitor) {
-        g_monitor->Stop();
+    g_web_server_running.store(false, std::memory_order_relaxed);
+    auto* monitor = g_monitor.load(std::memory_order_acquire);
+    if (monitor) {
+        monitor->Stop();
     }
     WSACleanup();
     exit(0);
@@ -267,13 +268,17 @@ void WebServerLoop(const PCMonitor::PerformanceMonitor& monitor, int port) {
                     std::string request(buffer);
                     std::string response = HandleRequest(request, monitor);
                     send(clientSocket, response.c_str(), static_cast<int>(response.length()), 0);
+                } else if (bytesReceived == SOCKET_ERROR) {
+                    std::cerr << "recv() failed: " << WSAGetLastError() << std::endl;
                 }
-                
+
+                shutdown(clientSocket, SD_SEND);
                 closesocket(clientSocket);
             }
         }
     }
     
+    shutdown(serverSocket, SD_BOTH);
     closesocket(serverSocket);
     WSACleanup();
 }
@@ -306,7 +311,17 @@ int main(int argc, char* argv[]) {
         }
         else if (arg == "--port" || arg == "-p") {
             if (i + 1 < argc) {
-                web_port = std::atoi(argv[++i]);
+                try {
+                    int port = std::stoi(argv[++i]);
+                    if (port < 1 || port > 65535) {
+                        std::cerr << "Port must be between 1 and 65535" << std::endl;
+                        return 1;
+                    }
+                    web_port = port;
+                } catch (const std::exception&) {
+                    std::cerr << "Invalid port number: " << argv[i] << std::endl;
+                    return 1;
+                }
             }
         }
         else if (arg == "--help" || arg == "-h") {
@@ -323,7 +338,7 @@ int main(int argc, char* argv[]) {
     
     // Create monitor instance
     PCMonitor::PerformanceMonitor monitor(std::chrono::milliseconds(1000));
-    g_monitor = &monitor;
+    g_monitor.store(&monitor, std::memory_order_release);
     
     // Set up signal handler
     signal(SIGINT, SignalHandler);
@@ -373,7 +388,9 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
             auto now = std::chrono::system_clock::now();
             auto time_t = std::chrono::system_clock::to_time_t(now);
-            std::cout << "📊 " << std::put_time(std::localtime(&time_t), "%H:%M:%S") 
+            struct tm tm_buf;
+            localtime_s(&tm_buf, &time_t);
+            std::cout << "📊 " << std::put_time(&tm_buf, "%H:%M:%S")
                       << " - Monitoring active (data logged to pc_monitor_log.csv)" << std::endl;
         }
     }

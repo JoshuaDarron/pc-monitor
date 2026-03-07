@@ -358,36 +358,47 @@
                 .addEventListener('change', e => applyTheme(e.matches));
         }
 
+        // Global configuration
+        const CONFIG = Object.freeze({
+            pollIntervalMs: 1000,
+            fetchTimeoutMs: 5000,
+            historyBufferSize: 60,
+            clockMaxDefaults: { gpu: 2500, cpu: 5500 },
+            chartMaxDefaults: { storageRead: 100, storageWrite: 100, netDown: 100, netUp: 100, power: 200 },
+            chartScaleFactor: 1.2,
+            clockScaleFactor: 1.1,
+            tempRange: { half: { min: 30, max: 100 }, case: { min: 20, max: 60 } },
+            colorStops: [
+                { pct: 0,   r: 66,  g: 165, b: 245 },  // blue  #42a5f5
+                { pct: 40,  r: 76,  g: 175, b: 80  },   // green #4caf50
+                { pct: 70,  r: 255, g: 235, b: 59  },   // yellow #ffeb3b
+                { pct: 100, r: 244, g: 67,  b: 54  }    // red   #f44336
+            ]
+        });
+
         let isConnected = true;
         let isInitialized = false;
 
-        // History buffers for area charts (60 entries = 1 minute at 1s polling)
+        // History buffers for area charts
         const utilizationHistory = { gpu: [], cpu: [], ram: [] };
         const storageHistory = { read: [], write: [] };
         const networkHistory = { download: [], upload: [] };
         const powerHistory = [];
 
         // Clock speed max tracker with sensible defaults, auto-expands
-        const clockMaxTracker = { gpu: 2500, cpu: 5500 };
+        const clockMaxTracker = { ...CONFIG.clockMaxDefaults };
 
         // Auto-scaling max trackers for non-percentage charts
-        const chartMaxTracker = { storageRead: 100, storageWrite: 100, netDown: 100, netUp: 100, power: 200 };
-
-        // Unified utilization color: blue (0%) → green (40%) → yellow (70%) → red (100%)
-        const colorStops = [
-            { pct: 0,   r: 66,  g: 165, b: 245 },  // blue  #42a5f5
-            { pct: 40,  r: 76,  g: 175, b: 80  },   // green #4caf50
-            { pct: 70,  r: 255, g: 235, b: 59  },   // yellow #ffeb3b
-            { pct: 100, r: 244, g: 67,  b: 54  }    // red   #f44336
-        ];
+        const chartMaxTracker = { ...CONFIG.chartMaxDefaults };
 
         function getUtilizationColor(pct) {
+            const stops = CONFIG.colorStops;
             pct = Math.max(0, Math.min(100, pct));
-            let lower = colorStops[0], upper = colorStops[colorStops.length - 1];
-            for (let i = 0; i < colorStops.length - 1; i++) {
-                if (pct >= colorStops[i].pct && pct <= colorStops[i + 1].pct) {
-                    lower = colorStops[i];
-                    upper = colorStops[i + 1];
+            let lower = stops[0], upper = stops[stops.length - 1];
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (pct >= stops[i].pct && pct <= stops[i + 1].pct) {
+                    lower = stops[i];
+                    upper = stops[i + 1];
                     break;
                 }
             }
@@ -536,8 +547,9 @@
             const padTop = 24;
             const padBottom = 4;
             const chartH = h - padTop - padBottom;
-            const stepX = (w - 2 * padX) / (60 - 1); // always 60-slot width
-            const offsetX = (60 - n) * stepX; // right-align data
+            const slots = CONFIG.historyBufferSize;
+            const stepX = (w - 2 * padX) / (slots - 1);
+            const offsetX = (slots - n) * stepX; // right-align data
 
             // Build points
             const pts = [];
@@ -635,8 +647,8 @@
             if (!fill || !text) return;
 
             // Auto-expand max tracker
-            if (clockMhz * 1.1 > clockMaxTracker[maxKey]) {
-                clockMaxTracker[maxKey] = clockMhz * 1.1;
+            if (clockMhz * CONFIG.clockScaleFactor > clockMaxTracker[maxKey]) {
+                clockMaxTracker[maxKey] = clockMhz * CONFIG.clockScaleFactor;
             }
 
             const fraction = Math.max(0, Math.min(1, clockMhz / clockMaxTracker[maxKey]));
@@ -648,7 +660,8 @@
         }
 
         // Clear canvas cache on resize
-        window.addEventListener('resize', () => { canvasContextCache.clear(); });
+        function handleResize() { canvasContextCache.clear(); }
+        window.addEventListener('resize', handleResize);
 
         function initializeDashboard() {
             const dashboardHTML = `
@@ -659,7 +672,7 @@
                         </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
-                                <svg class="half-gauge-svg" viewBox="0 0 140 85">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 85" role="img" aria-label="GPU temperature gauge">
                                     <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
                                     <path class="half-gauge-fill" id="gpu-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
                                           stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
@@ -668,7 +681,7 @@
                                 </svg>
                             </div>
                             <div class="clock-gauge-container">
-                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120" role="img" aria-label="GPU core clock speed gauge">
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
@@ -686,7 +699,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Utilization</span>
                             <span class="chart-value" id="gpu-util-value">--%</span>
-                            <canvas id="gpu-util-chart"></canvas>
+                            <canvas id="gpu-util-chart" role="img" aria-label="GPU utilization history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">VRAM Usage</span>
@@ -708,7 +721,7 @@
                         </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
-                                <svg class="half-gauge-svg" viewBox="0 0 140 85">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 85" role="img" aria-label="CPU temperature gauge">
                                     <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
                                     <path class="half-gauge-fill" id="cpu-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
                                           stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
@@ -717,7 +730,7 @@
                                 </svg>
                             </div>
                             <div class="clock-gauge-container">
-                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120" role="img" aria-label="CPU clock speed gauge">
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
@@ -735,7 +748,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Utilization</span>
                             <span class="chart-value" id="cpu-util-value">--%</span>
-                            <canvas id="cpu-util-chart"></canvas>
+                            <canvas id="cpu-util-chart" role="img" aria-label="CPU utilization history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Cores / Threads</span>
@@ -754,7 +767,7 @@
                         </div>
                         <div class="gauge-row">
                             <div class="clock-gauge-container">
-                                <svg class="clock-gauge-svg" viewBox="0 0 120 120">
+                                <svg class="clock-gauge-svg" viewBox="0 0 120 120" role="img" aria-label="RAM usage gauge">
                                     <circle class="clock-gauge-bg" cx="60" cy="60" r="50"
                                             stroke-dasharray="${CLOCK_ARC_LENGTH} 78.54"
                                             transform="rotate(135 60 60)" />
@@ -772,7 +785,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Utilization</span>
                             <span class="chart-value" id="ram-util-value">--%</span>
-                            <canvas id="ram-util-chart"></canvas>
+                            <canvas id="ram-util-chart" role="img" aria-label="RAM utilization history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Usage</span>
@@ -792,7 +805,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Sequential Read</span>
                             <span class="chart-value" id="storage-read-value">-- MB/s</span>
-                            <canvas id="storage-read-chart"></canvas>
+                            <canvas id="storage-read-chart" role="img" aria-label="Storage read speed history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Random Read (4K)</span>
@@ -801,7 +814,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Sequential Write</span>
                             <span class="chart-value" id="storage-write-value">-- MB/s</span>
-                            <canvas id="storage-write-chart"></canvas>
+                            <canvas id="storage-write-chart" role="img" aria-label="Storage write speed history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Random Write (4K)</span>
@@ -817,7 +830,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Download</span>
                             <span class="chart-value" id="net-down-value">-- KB/s</span>
-                            <canvas id="net-down-chart"></canvas>
+                            <canvas id="net-down-chart" role="img" aria-label="Network download speed history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Total Downloaded</span>
@@ -826,7 +839,7 @@
                         <div class="chart-container">
                             <span class="chart-label">Upload</span>
                             <span class="chart-value" id="net-up-value">-- KB/s</span>
-                            <canvas id="net-up-chart"></canvas>
+                            <canvas id="net-up-chart" role="img" aria-label="Network upload speed history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">Total Uploaded</span>
@@ -841,7 +854,7 @@
                         </div>
                         <div class="gauge-row">
                             <div class="gauge-container">
-                                <svg class="half-gauge-svg" viewBox="0 0 140 95">
+                                <svg class="half-gauge-svg" viewBox="0 0 140 95" role="img" aria-label="Case temperature gauge">
                                     <path class="half-gauge-bg" d="M 15 70 A 55 55 0 0 1 125 70" />
                                     <path class="half-gauge-fill" id="case-temp-gauge-fill" d="M 15 70 A 55 55 0 0 1 125 70"
                                           stroke-dasharray="${HALF_GAUGE_ARC_LENGTH}" stroke-dashoffset="${HALF_GAUGE_ARC_LENGTH}" />
@@ -854,7 +867,7 @@
                         <div class="chart-container">
                             <span class="chart-label">System Power</span>
                             <span class="chart-value" id="power-usage-value">-- W</span>
-                            <canvas id="power-usage-chart"></canvas>
+                            <canvas id="power-usage-chart" role="img" aria-label="System power usage history chart"></canvas>
                         </div>
                         <div class="metric-row">
                             <span class="metric-label">PSU Efficiency</span>
@@ -874,15 +887,22 @@
 
         async function updateMetrics() {
             try {
-                const response = await fetch('/api/metrics');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.fetchTimeoutMs);
+                const response = await fetch('/api/metrics', { signal: controller.signal });
+                clearTimeout(timeoutId);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                
+
                 const data = await response.json();
+
+                // Validate required top-level properties
+                if (!data.gpu || !data.cpu || !data.ram || !data.storage || !data.network || !data.power || !data.thermal) {
+                    throw new Error('Incomplete API response');
+                }
                 
                 // Update connection status
                 if (!isConnected) {
                     isConnected = true;
-                    document.querySelector('.status-dot').style.background = '#00ff88';
                 }
 
                 // Initialize dashboard HTML if first time
@@ -892,37 +912,39 @@
                 }
 
                 // Push utilization history and update clock max trackers
-                pushHistory(utilizationHistory.gpu, data.gpu.utilization_percent);
-                pushHistory(utilizationHistory.cpu, data.cpu.utilization_percent);
-                pushHistory(utilizationHistory.ram, data.ram.utilization_percent);
-                pushHistory(storageHistory.read, data.storage.seq_read_mbps);
-                pushHistory(storageHistory.write, data.storage.seq_write_mbps);
-                pushHistory(networkHistory.download, data.network.download_speed_kbps);
-                pushHistory(networkHistory.upload, data.network.upload_speed_kbps);
-                pushHistory(powerHistory, data.power.system_power_w);
+                pushHistory(utilizationHistory.gpu, data.gpu.utilization_percent, CONFIG.historyBufferSize);
+                pushHistory(utilizationHistory.cpu, data.cpu.utilization_percent, CONFIG.historyBufferSize);
+                pushHistory(utilizationHistory.ram, data.ram.utilization_percent, CONFIG.historyBufferSize);
+                pushHistory(storageHistory.read, data.storage.seq_read_mbps, CONFIG.historyBufferSize);
+                pushHistory(storageHistory.write, data.storage.seq_write_mbps, CONFIG.historyBufferSize);
+                pushHistory(networkHistory.download, data.network.download_speed_kbps, CONFIG.historyBufferSize);
+                pushHistory(networkHistory.upload, data.network.upload_speed_kbps, CONFIG.historyBufferSize);
+                pushHistory(powerHistory, data.power.system_power_w, CONFIG.historyBufferSize);
 
                 // Auto-scale storage and power chart maxes
-                if (data.storage.seq_read_mbps * 1.2 > chartMaxTracker.storageRead) {
-                    chartMaxTracker.storageRead = Math.round(data.storage.seq_read_mbps * 1.2);
+                const csf = CONFIG.chartScaleFactor;
+                if (data.storage.seq_read_mbps * csf > chartMaxTracker.storageRead) {
+                    chartMaxTracker.storageRead = Math.round(data.storage.seq_read_mbps * csf);
                 }
-                if (data.storage.seq_write_mbps * 1.2 > chartMaxTracker.storageWrite) {
-                    chartMaxTracker.storageWrite = Math.round(data.storage.seq_write_mbps * 1.2);
+                if (data.storage.seq_write_mbps * csf > chartMaxTracker.storageWrite) {
+                    chartMaxTracker.storageWrite = Math.round(data.storage.seq_write_mbps * csf);
                 }
-                if (data.network.download_speed_kbps * 1.2 > chartMaxTracker.netDown) {
-                    chartMaxTracker.netDown = Math.round(data.network.download_speed_kbps * 1.2);
+                if (data.network.download_speed_kbps * csf > chartMaxTracker.netDown) {
+                    chartMaxTracker.netDown = Math.round(data.network.download_speed_kbps * csf);
                 }
-                if (data.network.upload_speed_kbps * 1.2 > chartMaxTracker.netUp) {
-                    chartMaxTracker.netUp = Math.round(data.network.upload_speed_kbps * 1.2);
+                if (data.network.upload_speed_kbps * csf > chartMaxTracker.netUp) {
+                    chartMaxTracker.netUp = Math.round(data.network.upload_speed_kbps * csf);
                 }
-                if (data.power.system_power_w * 1.2 > chartMaxTracker.power) {
-                    chartMaxTracker.power = Math.round(data.power.system_power_w * 1.2);
+                if (data.power.system_power_w * csf > chartMaxTracker.power) {
+                    chartMaxTracker.power = Math.round(data.power.system_power_w * csf);
                 }
 
-                if (data.gpu.core_clock_mhz * 1.1 > clockMaxTracker.gpu) {
-                    clockMaxTracker.gpu = Math.round(data.gpu.core_clock_mhz * 1.1);
+                const ckf = CONFIG.clockScaleFactor;
+                if (data.gpu.core_clock_mhz * ckf > clockMaxTracker.gpu) {
+                    clockMaxTracker.gpu = Math.round(data.gpu.core_clock_mhz * ckf);
                 }
-                if (data.cpu.current_clock_mhz * 1.1 > clockMaxTracker.cpu) {
-                    clockMaxTracker.cpu = Math.round(data.cpu.current_clock_mhz * 1.1);
+                if (data.cpu.current_clock_mhz * ckf > clockMaxTracker.cpu) {
+                    clockMaxTracker.cpu = Math.round(data.cpu.current_clock_mhz * ckf);
                 }
 
                 // Batch all DOM mutations into a single repaint
@@ -991,13 +1013,18 @@
                 console.error('Error fetching metrics:', error);
                 if (isConnected) {
                     isConnected = false;
-                    document.querySelector('.status-dot').style.background = '#f44336';
-                    document.getElementById('dashboard').innerHTML = `
-                        <div class="error">
-                            ❌ Connection lost to monitoring service<br>
-                            <small>Error: ${error.message}</small>
-                        </div>
-                    `;
+                    const dashboard = document.getElementById('dashboard');
+                    dashboard.textContent = '';
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error';
+                    const mainText = document.createTextNode('Connection lost to monitoring service');
+                    const br = document.createElement('br');
+                    const small = document.createElement('small');
+                    small.textContent = 'Error: ' + error.message;
+                    errorDiv.appendChild(mainText);
+                    errorDiv.appendChild(br);
+                    errorDiv.appendChild(small);
+                    dashboard.appendChild(errorDiv);
                     elementCache.clear();
                     canvasContextCache.clear();
                     isInitialized = false;
@@ -1012,11 +1039,11 @@
             pollTimeoutId = setTimeout(async () => {
                 await updateMetrics();
                 schedulePoll();
-            }, 1000);
+            }, CONFIG.pollIntervalMs);
         }
 
         // Pause polling when the window is hidden/minimized, resume when visible
-        document.addEventListener('visibilitychange', () => {
+        function handleVisibilityChange() {
             if (document.hidden) {
                 if (pollTimeoutId !== null) {
                     clearTimeout(pollTimeoutId);
@@ -1028,7 +1055,8 @@
                     schedulePoll();
                 }
             }
-        });
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         // Initial load + start polling
         updateMetrics();
